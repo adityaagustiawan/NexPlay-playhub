@@ -1,120 +1,67 @@
 import { AppLayout } from "@/components/AppLayout";
-import { friends } from "@/data/gameData";
-import { UserPlus, MessageSquare, Gamepad2 } from "lucide-react";
+import { UserPlus, Search, Users, UserCheck } from "lucide-react";
 import { useState } from "react";
 
 const Friends = () => {
-  const [filter, setFilter] = useState<"all" | "online" | "in-game">("all");
-
-  const filtered = friends.filter((f) => {
-    if (filter === "all") return true;
-    if (filter === "online") return f.status === "online" || f.status === "in-game";
-    return f.status === "in-game";
-  });
-
-  const statusColor = (status: string) => {
-    if (status === "online") return "bg-primary";
-    if (status === "in-game") return "bg-accent";
-    return "bg-muted-foreground";
-  };
+  const [tab, setTab] = useState<"friends" | "requests" | "find">("friends");
 
   return (
     <AppLayout>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-heading text-3xl font-bold text-foreground">FRIENDS</h1>
-        <button className="bg-primary text-primary-foreground font-heading text-xs px-4 py-2 flex items-center gap-2">
+        <h1 className="font-heading text-2xl font-bold text-foreground">Friends</h1>
+        <button className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity">
           <UserPlus className="h-4 w-4" />
-          ADD FRIEND
+          Add Friend
         </button>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-8">
-        {(["all", "online", "in-game"] as const).map((f) => (
+      {/* Tabs — Roblox style */}
+      <div className="flex gap-1 mb-6 bg-secondary rounded-lg p-1 w-fit">
+        {([
+          { key: "friends", label: "Friends", icon: Users },
+          { key: "requests", label: "Requests", icon: UserCheck },
+          { key: "find", label: "Find Friends", icon: Search },
+        ] as const).map((t) => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`font-heading text-xs px-4 py-2 border ${
-              filter === f
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-muted-foreground border-border"
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-2 font-body text-sm px-4 py-2 rounded-md transition-colors ${
+              tab === t.key
+                ? "bg-card text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {f.toUpperCase().replace("-", " ")}
+            <t.icon className="h-4 w-4" />
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* Friends List - full-screen blocks */}
-      <div className="flex flex-col gap-2">
-        {filtered.map((friend) => (
-          <div
-            key={friend.id}
-            className="bg-card border border-border p-5 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-12 h-12 bg-secondary flex items-center justify-center font-heading text-sm text-foreground">
-                  {friend.avatar}
-                </div>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 ${statusColor(friend.status)} border-2 border-card`} />
-              </div>
-              <div>
-                <h3 className="font-heading text-sm font-bold text-foreground">
-                  {friend.name}
-                </h3>
-                {friend.status === "in-game" && friend.currentGame ? (
-                  <p className="font-body text-xs text-accent flex items-center gap-1">
-                    <Gamepad2 className="h-3 w-3" />
-                    Playing {friend.currentGame}
-                  </p>
-                ) : (
-                  <p className="font-body text-xs text-muted-foreground">
-                    {friend.status === "online" ? "Online" : "Offline"}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button className="bg-secondary text-foreground p-2">
-                <MessageSquare className="h-4 w-4" />
-              </button>
-              {friend.status === "in-game" && (
-                <button className="bg-accent text-accent-foreground font-heading text-xs px-4 py-2">
-                  JOIN
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Search */}
+      {tab === "find" && (
+        <div className="flex items-center bg-card border border-border rounded-lg px-4 py-3 mb-6 max-w-md">
+          <Search className="h-4 w-4 text-muted-foreground mr-3" />
+          <input
+            type="text"
+            placeholder="Search by username..."
+            className="bg-transparent font-body text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+          />
+        </div>
+      )}
 
-      {/* Friend Requests */}
-      <h2 className="font-heading text-lg font-bold text-foreground mt-10 mb-4">
-        FRIEND REQUESTS
-        <span className="ml-2 bg-accent text-accent-foreground font-heading text-xs px-2 py-1">
-          2
-        </span>
-      </h2>
-      <div className="flex flex-col gap-2">
-        {[{ name: "STAR_PILOT", avatar: "SP" }, { name: "QUANTUM_FOX", avatar: "QF" }].map((req) => (
-          <div key={req.name} className="bg-card border border-border p-5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-secondary flex items-center justify-center font-heading text-sm text-foreground">
-                {req.avatar}
-              </div>
-              <h3 className="font-heading text-sm font-bold text-foreground">{req.name}</h3>
-            </div>
-            <div className="flex gap-2">
-              <button className="bg-primary text-primary-foreground font-heading text-xs px-4 py-2">
-                ACCEPT
-              </button>
-              <button className="bg-secondary text-muted-foreground font-heading text-xs px-4 py-2">
-                DECLINE
-              </button>
-            </div>
-          </div>
-        ))}
+      {/* Empty State */}
+      <div className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center">
+        <Users className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="font-heading text-base font-bold text-foreground mb-2">
+          {tab === "friends" && "No friends yet"}
+          {tab === "requests" && "No friend requests"}
+          {tab === "find" && "Find players to connect with"}
+        </h3>
+        <p className="font-body text-sm text-muted-foreground text-center max-w-sm">
+          {tab === "friends" && "Add friends to see what they're playing, join their games, and chat."}
+          {tab === "requests" && "When someone sends you a friend request, it will appear here."}
+          {tab === "find" && "Search for players by their username and send them a friend request."}
+        </p>
       </div>
     </AppLayout>
   );

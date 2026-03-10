@@ -1,52 +1,24 @@
 import { AppLayout } from "@/components/AppLayout";
-import { GameCard, IgnitionOverlay } from "@/components/GameCard";
-import { games, Game } from "@/data/gameData";
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { GameRow } from "@/components/GameRow";
+import { Sparkles } from "lucide-react";
+import { NavLink } from "@/components/NavLink";
 
-const genres = ["ALL", "STRATEGY", "RPG", "RACING", "PUZZLE", "SIMULATION", "HORROR"];
+const genres = ["All", "Action", "Strategy", "RPG", "Racing", "Puzzle", "Simulation", "Horror", "Adventure"];
 
 const Explore = () => {
-  const [launching, setLaunching] = useState<Game | null>(null);
-  const [selectedGenre, setSelectedGenre] = useState("ALL");
-  const [search, setSearch] = useState("");
-
-  const filtered = games.filter((g) => {
-    const matchGenre = selectedGenre === "ALL" || g.genre === selectedGenre;
-    const matchSearch = g.title.toLowerCase().includes(search.toLowerCase());
-    return matchGenre && matchSearch;
-  });
-
   return (
     <AppLayout>
-      {launching && (
-        <IgnitionOverlay game={launching} onClose={() => setLaunching(null)} />
-      )}
-
-      <h1 className="font-heading text-3xl font-bold text-foreground mb-6">EXPLORE</h1>
-
-      {/* Search */}
-      <div className="flex items-center bg-card border border-border px-4 py-3 mb-6 max-w-md">
-        <Search className="h-4 w-4 text-muted-foreground mr-3" />
-        <input
-          type="text"
-          placeholder="Search games..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="bg-transparent font-body text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
-        />
-      </div>
+      <h1 className="font-heading text-2xl font-bold text-foreground mb-6">Discover</h1>
 
       {/* Genre Filter */}
       <div className="flex gap-2 mb-8 flex-wrap">
         {genres.map((genre) => (
           <button
             key={genre}
-            onClick={() => setSelectedGenre(genre)}
-            className={`font-heading text-xs px-4 py-2 border ${
-              selectedGenre === genre
+            className={`font-body text-sm px-4 py-2 rounded-lg border transition-colors ${
+              genre === "All"
                 ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-muted-foreground border-border"
+                : "bg-secondary text-muted-foreground border-border hover:text-foreground"
             }`}
           >
             {genre}
@@ -54,18 +26,45 @@ const Explore = () => {
         ))}
       </div>
 
-      {/* Games Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((game) => (
-          <GameCard key={game.id} game={game} onPlay={setLaunching} />
-        ))}
-      </div>
+      {/* Empty Sections */}
+      <GameRow
+        title="🎮 All Games"
+        isEmpty
+        emptyMessage="No games have been created yet. Be the first creator on NEXPLAY!"
+      >
+        {null}
+      </GameRow>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-20">
-          <p className="font-heading text-muted-foreground">NO GAMES FOUND</p>
-        </div>
-      )}
+      <GameRow
+        title="⭐ Top Rated"
+        isEmpty
+        emptyMessage="Top rated games by the community will appear here."
+      >
+        {null}
+      </GameRow>
+
+      <GameRow
+        title="👥 Most Played"
+        isEmpty
+        emptyMessage="The most popular games will show up here once players start exploring."
+      >
+        {null}
+      </GameRow>
+
+      {/* CTA */}
+      <div className="bg-card border border-border rounded-2xl p-8 text-center mt-4">
+        <h3 className="font-heading text-lg font-bold text-foreground mb-2">No games to discover yet?</h3>
+        <p className="font-body text-sm text-muted-foreground mb-4">
+          Create one with AI and share it with the world.
+        </p>
+        <NavLink
+          to="/create"
+          className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-heading text-sm font-semibold px-6 py-3 rounded-lg"
+        >
+          <Sparkles className="h-4 w-4" />
+          Start Creating
+        </NavLink>
+      </div>
     </AppLayout>
   );
 };
