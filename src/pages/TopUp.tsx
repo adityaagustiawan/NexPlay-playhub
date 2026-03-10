@@ -21,25 +21,25 @@ const TopUp = () => {
     <AppLayout>
       {purchased && (
         <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center">
-          <CheckCircle className="h-16 w-16 text-primary mb-4" />
-          <h2 className="font-heading text-2xl text-foreground mb-2">PURCHASE COMPLETE</h2>
+          <CheckCircle className="h-16 w-16 text-success mb-4" />
+          <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Purchase Complete</h2>
           <p className="font-body text-muted-foreground">Coins added to your account.</p>
         </div>
       )}
 
-      <h1 className="font-heading text-3xl font-bold text-foreground mb-2">TOP UP</h1>
+      <h1 className="font-heading text-2xl font-bold text-foreground mb-2">Top Up</h1>
       <p className="font-body text-muted-foreground mb-8">
-        Get Astro Coins to purchase games, cosmetics, and in-game items.
+        Get NexCoins to purchase games, cosmetics, and in-game items.
       </p>
 
       {/* Current Balance */}
-      <div className="bg-card border border-border p-6 mb-8 flex items-center gap-4 max-w-sm">
-        <div className="bg-primary p-3">
-          <Coins className="h-6 w-6 text-primary-foreground" />
+      <div className="bg-card border border-border rounded-xl p-5 mb-8 flex items-center gap-4 max-w-sm">
+        <div className="bg-primary/20 p-3 rounded-lg">
+          <Coins className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <p className="font-body text-xs text-muted-foreground">CURRENT BALANCE</p>
-          <p className="font-heading text-2xl font-bold text-foreground">1,250</p>
+          <p className="font-body text-xs text-muted-foreground">Current Balance</p>
+          <p className="font-heading text-2xl font-bold text-foreground">0</p>
         </div>
       </div>
 
@@ -49,16 +49,16 @@ const TopUp = () => {
           <button
             key={pkg.id}
             onClick={() => setSelected(pkg.id)}
-            className={`bg-card border-2 p-6 text-left relative ${
-              selected === pkg.id ? "border-primary" : "border-border"
-            } ${pkg.popular ? "" : ""}`}
+            className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors ${
+              selected === pkg.id ? "border-primary" : "border-border hover:border-primary/40"
+            }`}
           >
             {pkg.popular && (
-              <div className="absolute top-0 right-0 bg-accent text-accent-foreground font-heading text-[10px] px-2 py-1">
-                POPULAR
+              <div className="absolute top-3 right-3 bg-accent text-accent-foreground font-heading text-[10px] font-bold px-2 py-1 rounded-md">
+                Popular
               </div>
             )}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-3">
               <Coins className="h-5 w-5 text-primary" />
               <span className="font-heading text-xl font-bold text-foreground">
                 {pkg.coins.toLocaleString()}
@@ -67,8 +67,8 @@ const TopUp = () => {
             {pkg.bonus > 0 && (
               <div className="flex items-center gap-1 mb-3">
                 <Gift className="h-3 w-3 text-accent" />
-                <span className="font-body text-xs text-accent">
-                  +{pkg.bonus} bonus coins
+                <span className="font-body text-xs text-accent font-medium">
+                  +{pkg.bonus} bonus
                 </span>
               </div>
             )}
@@ -80,14 +80,13 @@ const TopUp = () => {
         ))}
       </div>
 
-      {/* Purchase Button */}
       {selected && (
         <button
           onClick={handlePurchase}
-          className="bg-primary text-primary-foreground font-heading text-sm px-8 py-4 flex items-center gap-3"
+          className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity"
         >
           <Coins className="h-5 w-5" />
-          PURCHASE NOW
+          Purchase Now
         </button>
       )}
     </AppLayout>
