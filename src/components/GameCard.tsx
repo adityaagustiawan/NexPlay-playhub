@@ -1,5 +1,6 @@
 import { Game } from "@/data/gameData";
 import { Play, Star, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 interface GameCardProps {
