@@ -12,7 +12,8 @@
 // destructive actions, other users, or to override instructions are refused and
 // the run is cancelled before any generation happens.
 import { checkPrompt } from "../lib/server/policy.js";
-import { generateGame } from "../lib/server/generator.js";
+import { generateGame, generateLocal } from "../lib/server/generator.js";
+import { verifyGame } from "../lib/server/verify.js";
 import { getAdminClient } from "../lib/server/admin.js";
 
 export const config = { runtime: "nodejs" } as const;
@@ -102,14 +103,46 @@ export async function POST(request: Request): Promise<Response> {
         await say("Choosing a genre and theme…", "info", 420);
         await say("Scaffolding the scene…", "info", 420);
 
-        const game = await generateGame(prompt);
+        let game = await generateGame(prompt);
 
         await say(`Assembling “${game.title}”…`, "info", 360);
         await say("Compiling gameplay config…", "info", 340);
+
+        // --- Self-check: the AI verifies its own game before handing it over ---
+        await say("Verifying the game…", "info", 320);
+        let verify = verifyGame(game);
+        if (!verify.ok) {
+          // If the model produced something unplayable, fall back to the
+          // deterministic generator and re-verify.
+          game = generateLocal(prompt);
+          verify = verifyGame(game);
+        }
+        for (const check of verify.checks) {
+          send({
+            type: "line",
+            level: check.ok ? "ok" : "warning",
+            text: `${check.ok ? "✔" : "✖"} check ${check.name}: ${check.detail}`,
+          });
+          await sleep(200);
+        }
+
+        if (!verify.ok) {
+          send({
+            type: "warning",
+            text: "NexCode could not verify this game as playable, so it was discarded. Try rewording your idea.",
+          });
+          await say("Run aborted — unverified game discarded.", "error", 120);
+          controller.close();
+          closed = true;
+          return;
+        }
+
+        game.assets = { ...game.assets, verified: true, verifiedAt: new Date().toISOString() };
+
         await say("Packaging your game…", "info", 300);
 
         send({ type: "result", game });
-        await say("Done — your game is ready. Press Play.", "ok", 60);
+        await say("Done — verified and ready. Press Play.", "ok", 60);
       } catch (err) {
         send({ type: "error", message: err instanceof Error ? err.message : String(err) });
       } finally {

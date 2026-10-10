@@ -24,6 +24,7 @@ interface UseNexCode {
   blocked: string | null;
   error: string | null;
   clear: () => void;
+  pushLine: (level: NexCodeLevel, text: string) => void;
   run: (prompt: string, token: string | null | undefined) => Promise<GeneratedGame | null>;
 }
 
@@ -126,5 +127,5 @@ export function useNexCode(): UseNexCode {
     [push]
   );
 
-  return { lines, running, blocked, error, clear, run };
+  return { lines, running, blocked, error, clear, pushLine: push, run };
 }
