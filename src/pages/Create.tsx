@@ -2,12 +2,14 @@
 // Anyone can describe a game and let NexCode build it. Free tier is a trial of
 // up to 5 games (enforced server-side); Pro Creator lifts the limit. Creators
 // can play, submit for review, and delete their own games.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useNexCode } from "@/hooks/useNexCode";
 import { NexCodeTerminal } from "@/components/NexCodeTerminal";
+import { GamePreview } from "@/components/GamePreview";
+import type { GamePackage } from "@/engine/gameLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +64,8 @@ const Create = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ pkg: GamePackage; gameKey: string; title: string } | null>(null);
+  const renderCheckedRef = useRef<Set<string>>(new Set());
 
   const atLimit = !isPro && myGames.length >= FREE_TRIAL_LIMIT;
   const remaining = Math.max(0, FREE_TRIAL_LIMIT - myGames.length);
