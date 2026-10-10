@@ -67,16 +67,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
 
         {/* User */}
         <div className="px-4 mt-auto">
-          <NavLink
-            to="/login"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors"
-            onClick={onClose}
-          >
-            <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center font-heading text-xs text-primary font-bold">
-              ?
-            </div>
-            <span className="font-body text-sm text-muted-foreground">Sign In</span>
-          </NavLink>
+          <UserFooter />
         </div>
       </nav>
     </>
