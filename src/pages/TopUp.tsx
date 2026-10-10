@@ -1,9 +1,11 @@
 import { AppLayout } from "@/components/AppLayout";
 import { topUpPackages } from "@/data/gameData";
-import { Coins, Zap, Gift, CheckCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Coins, Zap, Gift, AlertCircle } from "lucide-react";
 import { useState } from "react";
 
 const TopUp = () => {
+  const { user, profile } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
 
@@ -20,10 +22,13 @@ const TopUp = () => {
   return (
     <AppLayout>
       {purchased && (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center">
-          <CheckCircle className="h-16 w-16 text-success mb-4" />
-          <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Purchase Complete</h2>
-          <p className="font-body text-muted-foreground">Coins added to your account.</p>
+        <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
+          <AlertCircle className="h-16 w-16 text-accent mb-4" />
+          <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Payments not connected yet</h2>
+          <p className="font-body text-muted-foreground max-w-sm">
+            This is a demo store — no real charge was made and no coins were added.
+            Connect Stripe (or another payment provider) on the server to make purchases real.
+          </p>
         </div>
       )}
 
@@ -39,7 +44,14 @@ const TopUp = () => {
         </div>
         <div>
           <p className="font-body text-xs text-muted-foreground">Current Balance</p>
-          <p className="font-heading text-2xl font-bold text-foreground">0</p>
+          <p className="font-heading text-2xl font-bold text-foreground">
+            {user ? (profile?.coins ?? 0).toLocaleString() : "—"}
+          </p>
+          {!user && (
+            <p className="font-body text-xs text-muted-foreground">
+              <a href="/login" className="text-primary hover:underline">Sign in</a> to see your balance
+            </p>
+          )}
         </div>
       </div>
 
