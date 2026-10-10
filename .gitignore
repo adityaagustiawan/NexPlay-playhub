@@ -15,6 +15,9 @@ dist-ssr
 # Environment files (values are public anon keys, but don't commit them)
 .env
 
+# Supabase CLI scratch (link state)
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
