@@ -28,9 +28,10 @@ import {
   Crown,
   Lock,
   Check,
+  Trash2,
 } from "lucide-react";
 
-const FREE_TIER_LIMIT = 3;
+const FREE_TIER_LIMIT = 5;
 
 interface Game {
   id: string;
@@ -204,12 +205,14 @@ const Creator = () => {
       return;
     }
 
+    // Creators may only move their own games to 'pending' (admin approval
+    // publishes them), so the studio submits for review rather than publishing.
     const { error: releaseError } = await supabase
       .from("games")
       .update({
         released_at: new Date().toISOString(),
         version: (game.version ?? 1) + 1,
-        status: "published",
+        status: "pending",
         is_draft: false,
       })
       .eq("id", gameId);
@@ -217,13 +220,27 @@ const Creator = () => {
     setReleasing(null);
 
     if (releaseError) {
-      setError(`Failed to release: ${releaseError.message}`);
+      setError(`Failed to submit: ${releaseError.message}`);
       return;
     }
 
     const playUrl = `${window.location.origin}/play/${game.game_key}`;
-    setSuccess(`Game "${game.title}" is now live! Play at: ${playUrl}`);
+    setSuccess(`Game "${game.title}" submitted for review. Play at: ${playUrl}`);
 
+    await loadMyGames();
+  };
+
+  const handleDelete = async (gameId: string, title: string) => {
+    if (!user) return;
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setError(null);
+    setSuccess(null);
+    const { error: delError } = await supabase.from("games").delete().eq("id", gameId);
+    if (delError) {
+      setError(`Failed to delete: ${delError.message}`);
+      return;
+    }
+    setSuccess(`Game "${title}" deleted.`);
     await loadMyGames();
   };
 
@@ -232,6 +249,52 @@ const Creator = () => {
   const publishedCount = myGames.filter((g) => g.released_at).length;
   const draftCount = myGames.filter((g) => !g.released_at).length;
   const gamesRemaining = isPro ? Infinity : Math.max(0, FREE_TIER_LIMIT - myGames.length);
+
+  // Creator Studio is a Pro feature. Free creators build in /create
+  // (a trial of FREE_TIER_LIMIT games). Non-Pro users see this upgrade screen.
+  if (!isPro) {
+    const benefits = [
+      "Unlimited game creation",
+      "Creator analytics",
+      "Monetization & earn tools",
+      "Priority review",
+    ];
+    return (
+      <AppLayout>
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-card border border-border rounded-2xl p-8 text-center">
+            <div className="h-14 w-14 rounded-full bg-primary/15 flex items-center justify-center mx-auto mb-4">
+              <Crown className="h-7 w-7 text-primary" />
+            </div>
+            <h1 className="font-heading text-2xl font-bold text-foreground mb-2">
+              Creator Studio is a Pro feature
+            </h1>
+            <p className="font-body text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              Unlock it with any one-time top-up — no subscription. Not ready yet? You can still
+              build up to {FREE_TIER_LIMIT} games for free.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto mb-7 text-left">
+              {benefits.map((b) => (
+                <div key={b} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="font-body text-sm text-foreground">{b}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <Button onClick={goToTopUp}>
+                <Crown className="h-4 w-4 mr-1" />
+                Top Up to Go Pro
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/create")}>
+                Try free creation
+              </Button>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -507,16 +570,25 @@ const Creator = () => {
                           {releasing === game.id ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Releasing...
+                              Submitting...
                             </>
                           ) : (
                             <>
                               <TrendingUp className="h-4 w-4 mr-1" />
-                              Publish
+                              Submit
                             </>
                           )}
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(game.id, game.title)}
+                        aria-label={`Delete ${game.title}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
