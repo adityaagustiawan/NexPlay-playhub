@@ -6,7 +6,12 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  profile: { display_name: string | null; avatar_url: string | null; coins: number } | null;
+  profile: {
+    display_name: string | null;
+    avatar_url: string | null;
+    bio: string | null;
+    coins: number;
+  } | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -27,12 +32,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
-      .select("display_name, avatar_url, coins")
+      .select("display_name, avatar_url, bio, coins")
       .eq("user_id", userId)
-      .single();
-    if (data) setProfile(data);
+      .maybeSingle();
+    if (error) {
+      console.error("Failed to load profile:", error.message);
+      return;
+    }
+    // Rows created before the profiles migration/trigger existed can be missing.
+    setProfile(data ?? { display_name: null, avatar_url: null, bio: null, coins: 0 });
   };
 
   const refreshProfile = async () => {

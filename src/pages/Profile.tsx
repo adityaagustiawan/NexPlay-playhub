@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { User, Coins, Save, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -9,17 +9,32 @@ const Profile = () => {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
-  const [bio, setBio] = useState("");
+  const [bio, setBio] = useState(profile?.bio || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // The profile loads asynchronously — keep the form in sync once it arrives
+  // (previously the inputs stayed empty forever because state was initialized
+  // before the fetch resolved).
+  useEffect(() => {
+    setDisplayName(profile?.display_name || "");
+    setBio(profile?.bio || "");
+  }, [profile?.display_name, profile?.bio]);
 
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    await supabase
+    setSaveError("");
+    const { error } = await supabase
       .from("profiles")
       .update({ display_name: displayName, bio })
       .eq("user_id", user.id);
+    if (error) {
+      setSaveError(error.message);
+      setSaving(false);
+      return;
+    }
     await refreshProfile();
     setSaving(false);
     setSaved(true);
@@ -74,6 +89,12 @@ const Profile = () => {
               placeholder="Tell the world about yourself..."
             />
           </div>
+
+          {saveError && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+              <p className="font-body text-sm text-destructive">{saveError}</p>
+            </div>
+          )}
 
           <button
             onClick={handleSave}
