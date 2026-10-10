@@ -28,6 +28,7 @@ import {
   Crown,
   Lock,
   Check,
+  Trash2,
 } from "lucide-react";
 
 const FREE_TIER_LIMIT = 3;
