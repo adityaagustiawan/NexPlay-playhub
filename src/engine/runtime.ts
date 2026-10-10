@@ -137,13 +137,24 @@ export function mountGame(
   window.addEventListener("resize", resize);
 
   // --- Input ---
+  const isTypingTarget = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  };
   const onKeyDown = (e: KeyboardEvent) => {
+    // Never hijack keys while the player is typing in a form field.
+    if (isTypingTarget(e.target)) return;
     pressed.add(e.key);
     if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
     }
   };
-  const onKeyUp = (e: KeyboardEvent) => pressed.delete(e.key);
+  const onKeyUp = (e: KeyboardEvent) => {
+    if (isTypingTarget(e.target)) return;
+    pressed.delete(e.key);
+  };
 
   const pointerPos = (e: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
