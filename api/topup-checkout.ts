@@ -4,8 +4,8 @@
 // Body:     { "packageId": "3" }
 // Response: { "url": "https://checkout.stripe.com/c/pay/..." }
 import Stripe from "stripe";
-import { findPackage } from "../lib/server/packages";
-import { getAdminClient, isServerConfigured } from "../lib/server/admin";
+import { findPackage } from "../lib/server/packages.js";
+import { getAdminClient, isServerConfigured } from "../lib/server/admin.js";
 
 export const config = { runtime: "nodejs" } as const;
 
