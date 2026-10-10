@@ -1,7 +1,8 @@
-import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2 } from "lucide-react";
+import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2, Wrench } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 import { BetaBadge } from "@/components/BetaBadge";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { title: "Home", url: "/library", icon: Home },
@@ -16,6 +17,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
+  const { user } = useAuth();
+
   return (
     <>
       {/* Mobile overlay */}
