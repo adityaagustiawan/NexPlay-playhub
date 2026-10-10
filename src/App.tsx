@@ -9,6 +9,8 @@ import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
 import Create from "./pages/Create";
+import Creator from "./pages/Creator";
+import Play from "./pages/Play";
 import Friends from "./pages/Friends";
 import TopUp from "./pages/TopUp";
 import Login from "./pages/Login";
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<Create />} />
+            <Route path="/creator" element={<RequireAuth><Creator /></RequireAuth>} />
+            <Route path="/play/:gameKey" element={<Play />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/topup" element={<RequireAuth><TopUp /></RequireAuth>} />
             <Route path="/login" element={<Login />} />
