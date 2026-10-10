@@ -1,0 +1,16 @@
+import { chromium } from "playwright";
+const BASE = process.env.BASE || "https://nexconsole.vercel.app";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+const logs = [];
+page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
+page.on("requestfailed", (r) => logs.push(`[requestfailed] ${r.url()} :: ${r.failure()?.errorText}`));
+await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+await page.fill('input[type="email"]', "login-probe@example.com");
+await page.fill('input[type="password"]', "wrong-password-123");
+await page.click('button[type="submit"]');
+await page.waitForTimeout(5000);
+const form = (await page.locator("form").innerText()).replace(/\s+/g, " ").slice(0, 200);
+console.log("form:", form);
+console.log("network failures:", logs.filter(l => l.startsWith("[requestfailed]")).length ? logs.filter(l => l.startsWith("[requestfailed]")).join("\n") : "none");
+await browser.close();
