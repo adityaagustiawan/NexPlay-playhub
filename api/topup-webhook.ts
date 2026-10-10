@@ -2,7 +2,7 @@
 // Stripe webhook endpoint. Verifies the signature, then credits NexCoins to the
 // player via the service-role client (idempotent per checkout session).
 import Stripe from "stripe";
-import { getAdminClient } from "./_lib/admin";
+import { getAdminClient } from "../lib/server/admin";
 
 export const config = { runtime: "nodejs" } as const;
 
