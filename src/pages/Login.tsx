@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { authErrorMessage, friendlyAuthError } from "@/lib/authError";
 import { NavLink } from "@/components/NavLink";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { LogIn, Mail, Lock, Eye, EyeOff, Gamepad2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -13,17 +15,24 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from || "/";
+  const redirectTo = `${window.location.origin}${from.startsWith("/") ? from : "/"}`;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(friendlyAuthError(error.message));
+        return;
+      }
       navigate(from, { replace: true });
+    } catch (err) {
+      // supabase-js rejects (rather than returning { error }) on network failure
+      setError(authErrorMessage(err));
+    } finally {
+      setLoading(false);
     }
   };
 
