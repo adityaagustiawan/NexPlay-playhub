@@ -1,9 +1,10 @@
 import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
+import { BetaBadge } from "@/components/BetaBadge";
 
 const navItems = [
-  { title: "Home", url: "/", icon: Home },
+  { title: "Home", url: "/library", icon: Home },
   { title: "Discover", url: "/explore", icon: Compass },
   { title: "Create", url: "/create", icon: Sparkles },
   { title: "Top Up", url: "/topup", icon: Coins },
@@ -33,6 +34,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             <span>
               <span className="text-primary">NEX</span>CONSOLE
             </span>
+            <BetaBadge className="!py-0" />
           </h1>
           <button onClick={onClose} className="md:hidden text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
@@ -58,7 +60,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
             <NavLink
               key={item.title}
               to={item.url}
-              end={item.url === "/"}
+              end={item.url === "/library"}
               className="flex items-center gap-3 px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
               activeClassName="bg-secondary text-foreground"
               onClick={onClose}
