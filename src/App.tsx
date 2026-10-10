@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import { RequireAuth } from "@/components/RequireAuth";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
 import Create from "./pages/Create";
@@ -29,10 +30,10 @@ const App = () => (
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<Create />} />
             <Route path="/friends" element={<Friends />} />
-            <Route path="/topup" element={<TopUp />} />
+            <Route path="/topup" element={<RequireAuth><TopUp /></RequireAuth>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
             <Route path="/game/:id" element={<GameDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
