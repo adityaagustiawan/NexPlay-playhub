@@ -1,6 +1,7 @@
 import { Search, Bell, Users, MessageSquare, Menu, Gamepad2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { BetaBadge } from "@/components/BetaBadge";
 
 interface TopBarProps {
   onMenuToggle?: () => void;
@@ -17,12 +18,13 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       </button>
 
       {/* Logo — mobile only */}
-      <span className="md:hidden flex items-center gap-1.5 font-heading text-lg font-bold text-foreground">
-        <Gamepad2 className="h-5 w-5 text-primary" />
-        <span>
-          <span className="text-primary">NEX</span>CONSOLE
+        <span className="md:hidden flex items-center gap-1.5 font-heading text-lg font-bold text-foreground">
+          <Gamepad2 className="h-5 w-5 text-primary" />
+          <span>
+            <span className="text-primary">NEX</span>CONSOLE
+          </span>
+          <BetaBadge className="ml-0.5 !py-0" />
         </span>
-      </span>
 
       {/* Search */}
       <div className="hidden sm:flex items-center bg-secondary rounded-lg px-3 py-2 flex-1 max-w-md">
