@@ -137,13 +137,25 @@ export function mountGame(
   window.addEventListener("resize", resize);
 
   // --- Input ---
+  const isTypingTarget = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  };
   const onKeyDown = (e: KeyboardEvent) => {
+    // Never hijack keys while the player is typing in a form field.
+    if (isTypingTarget(e.target)) return;
     pressed.add(e.key);
     if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
     }
   };
-  const onKeyUp = (e: KeyboardEvent) => pressed.delete(e.key);
+  const onKeyUp = (e: KeyboardEvent) => {
+    // Always release the key, even if the event landed on a form field.
+    pressed.delete(e.key);
+  };
+  const clearKeys = () => pressed.clear();
 
   const pointerPos = (e: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
@@ -160,6 +172,7 @@ export function mountGame(
 
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", clearKeys);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.style.touchAction = "none";
@@ -521,6 +534,7 @@ export function mountGame(
       window.removeEventListener("resize", resize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearKeys);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerdown", onPointerDown);
     },
