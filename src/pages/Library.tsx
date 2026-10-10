@@ -11,7 +11,7 @@ const Library = () => {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="font-heading text-3xl font-bold text-foreground mb-2">
-              Welcome to NEXPLAY
+              Welcome to NEXPLAY.AI
             </h1>
             <p className="font-body text-muted-foreground max-w-lg mb-6">
               Play games created by the community, or build your own with AI. 
