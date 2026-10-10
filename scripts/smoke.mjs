@@ -1,7 +1,7 @@
 // Quick runtime smoke test: loads every route, captures console errors & page errors.
 import { chromium } from "playwright";
 
-const BASE = "http://localhost:8080";
+const BASE = process.env.SMOKE_BASE || "http://localhost:8080";
 const routes = ["/", "/explore", "/create", "/friends", "/topup", "/login", "/signup", "/profile", "/game/1", "/nope"];
 
 const browser = await chromium.launch();
