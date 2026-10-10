@@ -1,4 +1,4 @@
-// POST /api/topup-webhook
+// Vercel function: /api/topup-webhook
 // Stripe webhook endpoint. Verifies the signature, then credits NexCoins to the
 // player via the service-role client (idempotent per checkout session).
 import Stripe from "stripe";
@@ -6,11 +6,11 @@ import { getAdminClient } from "../lib/server/admin.js";
 
 export const config = { runtime: "nodejs" } as const;
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
-  }
+export async function GET(): Promise<Response> {
+  return json({ error: "Method not allowed" }, 405);
+}
 
+export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     return json(
@@ -20,8 +20,8 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   // Stripe also requires the raw body for signature verification.
-  const raw = await req.text();
-  const signature = req.headers.get("stripe-signature") || "";
+  const raw = await request.text();
+  const signature = request.headers.get("stripe-signature") || "";
 
   let event: Stripe.Event;
   try {
