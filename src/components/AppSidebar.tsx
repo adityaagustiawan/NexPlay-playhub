@@ -1,4 +1,4 @@
-import { Home, Compass, Sparkles, Coins, Plus, X } from "lucide-react";
+import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 
@@ -28,8 +28,11 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       >
         {/* Logo + close on mobile */}
         <div className="px-5 mb-6 flex items-center justify-between">
-          <h1 className="font-heading text-xl font-bold text-foreground tracking-tight">
-            <span className="text-primary">NEX</span>PLAY<span className="text-primary">.AI</span>
+          <h1 className="font-heading text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Gamepad2 className="h-5 w-5 text-primary" />
+            <span>
+              <span className="text-primary">NEX</span>CONSOLE
+            </span>
           </h1>
           <button onClick={onClose} className="md:hidden text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
