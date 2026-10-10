@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { authErrorMessage, friendlyAuthError } from "@/lib/authError";
 import { NavLink } from "@/components/NavLink";
 import { UserPlus, Mail, Lock, User, Eye, EyeOff, Gamepad2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -25,20 +26,25 @@ const Signup = () => {
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: displayName },
-        emailRedirectTo: window.location.origin,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { display_name: displayName },
+          emailRedirectTo: window.location.origin,
+        },
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      setSuccess(true);
+      if (error) {
+        setError(friendlyAuthError(error.message));
+      } else {
+        setSuccess(true);
+      }
+    } catch (err) {
+      // supabase-js rejects (rather than returning { error }) on network failure
+      setError(authErrorMessage(err));
+    } finally {
       setLoading(false);
     }
   };

@@ -1,34 +1,85 @@
 import { AppLayout } from "@/components/AppLayout";
 import { topUpPackages } from "@/data/gameData";
 import { useAuth } from "@/hooks/useAuth";
-import { Coins, Zap, Gift, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Coins, Zap, Gift, AlertCircle, Loader2, CheckCircle2, Info } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const TopUp = () => {
-  const { user, profile } = useAuth();
+  const { user, session, profile, refreshProfile } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
-  const [purchased, setPurchased] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handlePurchase = () => {
-    if (selected) {
-      setPurchased(true);
-      setTimeout(() => {
-        setPurchased(false);
-        setSelected(null);
-      }, 2000);
+  // Handle returning from Stripe (success or cancel).
+  const params = new URLSearchParams(window.location.search);
+  const justPaid = params.get("success") === "1";
+  const cancelled = params.get("cancelled") === "1";
+
+  useEffect(() => {
+    if (justPaid) {
+      // Balance updates via the webhook; refresh to show the new coins.
+      refreshProfile();
+      window.history.replaceState({}, "", "/topup");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePurchase = async () => {
+    if (!selected || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = session?.access_token;
+      if (!token) {
+        setError("You need to sign in before purchasing NexCoins.");
+        setLoading(false);
+        return;
+      }
+      const res = await fetch("/api/topup-checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ packageId: selected }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.message || data?.error || `Request failed (${res.status})`);
+        setLoading(false);
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setError("No checkout URL returned by the server.");
+      }
+    } catch {
+      setError("Can't reach the payment server. Please try again in a moment.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <AppLayout>
-      {purchased && (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
-          <AlertCircle className="h-16 w-16 text-accent mb-4" />
-          <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Payments not connected yet</h2>
-          <p className="font-body text-muted-foreground max-w-sm">
-            This is a demo store — no real charge was made and no coins were added.
-            Connect Stripe (or another payment provider) on the server to make purchases real.
+      {justPaid && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 max-w-2xl">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+          <p className="font-body text-sm text-emerald-500">
+            Payment received! Your NexCoins have been added to your account.
           </p>
+        </div>
+      )}
+      {cancelled && (
+        <div className="bg-muted border border-border rounded-xl p-4 mb-6 flex items-center gap-3 max-w-2xl">
+          <Info className="h-5 w-5 text-muted-foreground shrink-0" />
+          <p className="font-body text-sm text-muted-foreground">
+            Checkout cancelled — nothing was charged and no coins were added.
+          </p>
+        </div>
+      )}
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6 flex items-start gap-3 max-w-2xl">
+          <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+          <p className="font-body text-sm text-destructive">{error}</p>
         </div>
       )}
 
@@ -61,7 +112,8 @@ const TopUp = () => {
           <button
             key={pkg.id}
             onClick={() => setSelected(pkg.id)}
-            className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors ${
+            disabled={loading}
+            className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors disabled:opacity-50 ${
               selected === pkg.id ? "border-primary" : "border-border hover:border-primary/40"
             }`}
           >
@@ -95,10 +147,11 @@ const TopUp = () => {
       {selected && (
         <button
           onClick={handlePurchase}
-          className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity"
+          disabled={loading}
+          className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          <Coins className="h-5 w-5" />
-          Purchase Now
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Coins className="h-5 w-5" />}
+          {loading ? "Opening secure checkout…" : "Purchase Now"}
         </button>
       )}
     </AppLayout>
