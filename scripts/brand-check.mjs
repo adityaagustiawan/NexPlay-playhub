@@ -1,0 +1,10 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const p = await b.newPage();
+await p.goto("http://localhost:8080/", { waitUntil: "networkidle" });
+const text = await p.locator("body").innerText();
+console.log("Contains NEXPLAY.AI:", text.includes("NEXPLAY.AI"));
+console.log("Still has bare NEXPLAY:", /NEXPLAY(?!\.AI)/.test(text));
+console.log("Sample:", text.replace(/\s+/g, " ").slice(0, 60));
+console.log("Title:", await p.title());
+await b.close();

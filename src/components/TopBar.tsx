@@ -18,7 +18,7 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
 
       {/* Logo — mobile only */}
       <span className="md:hidden font-heading text-lg font-bold text-foreground">
-        <span className="text-primary">NEX</span>PLAY
+        <span className="text-primary">NEX</span>PLAY<span className="text-primary">.AI</span>
       </span>
 
       {/* Search */}
