@@ -1,5 +1,6 @@
 // Creator.tsx — Creator Studio with Free/Pro tier system.
-// Free: max 3 games. Pro: one-time top-up for unlimited games.
+// Free: max 3 games. Pro: unlocked by any completed top-up → unlimited games.
+// The tier is granted server-side by the top-up webhook; clients cannot set it.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
@@ -30,7 +31,6 @@ import {
 } from "lucide-react";
 
 const FREE_TIER_LIMIT = 3;
-const PRO_PRICE_CENTS = 499; // $4.99
 
 interface Game {
   id: string;
@@ -63,7 +63,6 @@ const Creator = () => {
   const [gameplayJson, setGameplayJson] = useState('{\n  "difficulty": "medium",\n  "levels": 3\n}');
   const [releasing, setReleasing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
 
   // Error/success messages
   const [error, setError] = useState<string | null>(null);
@@ -115,46 +114,10 @@ const Creator = () => {
     loadScores();
   }, [user]);
 
-  const handleUpgradeToPro = async () => {
-    if (!user) return;
-    setUpgrading(true);
-    setError(null);
-
-    try {
-      // Record the purchase
-      const { error: purchaseError } = await supabase.from("creator_purchases").insert({
-        user_id: user.id,
-        tier: "pro",
-        amount_cents: PRO_PRICE_CENTS,
-        status: "completed",
-      });
-
-      if (purchaseError) {
-        setError(`Failed to process upgrade: ${purchaseError.message}`);
-        setUpgrading(false);
-        return;
-      }
-
-      // Update profile to pro
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ creator_tier: "pro" })
-        .eq("user_id", user.id);
-
-      if (profileError) {
-        setError(`Failed to update profile: ${profileError.message}`);
-        setUpgrading(false);
-        return;
-      }
-
-      setSuccess("Welcome to Pro! You now have unlimited game creation.");
-      // Reload profile
-      window.location.reload();
-    } catch (err) {
-      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setUpgrading(false);
-    }
+  // Pro is unlocked by any completed top-up (handled server-side by the
+  // top-up webhook), so the upgrade CTA simply sends the user to /topup.
+  const goToTopUp = () => {
+    navigate("/topup?unlock=pro");
   };
 
   const handleCreateGame = async () => {
@@ -162,7 +125,9 @@ const Creator = () => {
 
     // Check free tier limit
     if (!isPro && myGames.length >= FREE_TIER_LIMIT) {
-      setError(`Free tier limited to ${FREE_TIER_LIMIT} games. Upgrade to Pro for unlimited creation.`);
+      setError(
+        `Free tier is limited to ${FREE_TIER_LIMIT} games. Top up any amount to unlock Pro and create unlimited games.`
+      );
       return;
     }
 
@@ -319,26 +284,13 @@ const Creator = () => {
                   Free tier: {myGames.length}/{FREE_TIER_LIMIT} games used
                 </p>
                 <p className="font-body text-xs text-muted-foreground">
-                  Upgrade to Pro for unlimited game creation
+                  Top up any amount once to unlock Pro — unlimited game creation
                 </p>
               </div>
             </div>
-            <Button
-              size="sm"
-              onClick={handleUpgradeToPro}
-              disabled={upgrading}
-            >
-              {upgrading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Upgrading...
-                </>
-              ) : (
-                <>
-                  <Crown className="h-4 w-4 mr-1" />
-                  Upgrade $4.99
-                </>
-              )}
+            <Button size="sm" onClick={goToTopUp}>
+              <Crown className="h-4 w-4 mr-1" />
+              Top Up to Go Pro
             </Button>
           </div>
         )}
