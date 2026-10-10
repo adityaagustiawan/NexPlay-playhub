@@ -1,21 +1,20 @@
-// POST /api/topup-checkout
+// Vercel function: /api/topup-checkout
 // Creates a Stripe Checkout Session for an authenticated player.
-// Requires: Authorization: Bearer <supabase access token>
-// Body:     { "packageId": "3" }
-// Response: { "url": "https://checkout.stripe.com/c/pay/..." }
+//   POST { "packageId": "3" }  with  Authorization: Bearer <access token>
+// -> { "url": "https://checkout.stripe.com/c/pay/..." }
 import Stripe from "stripe";
 import { findPackage } from "../lib/server/packages.js";
 import { getAdminClient, isServerConfigured } from "../lib/server/admin.js";
 
 export const config = { runtime: "nodejs" } as const;
 
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405);
-  }
+export async function GET(): Promise<Response> {
+  return json({ error: "Method not allowed" }, 405);
+}
 
+export async function POST(request: Request): Promise<Response> {
   // 1) Unauthenticated clients are rejected before anything else.
-  const auth = req.headers.get("authorization") || "";
+  const auth = request.headers.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "");
   if (!token) {
     return json({ error: "Missing access token" }, 401);
@@ -38,7 +37,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   let body: { packageId?: string };
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
   }
