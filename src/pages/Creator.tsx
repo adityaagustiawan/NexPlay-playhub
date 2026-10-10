@@ -1,5 +1,5 @@
-// Creator.tsx — Creator dashboard with tabs:
-// Dashboard | Buat Game | Game Saya | Data & Skor | Publikasi
+// Creator.tsx — Creator Studio inspired by Astrocade's clean AI-first design.
+// Tabs: Create | My Games | Analytics | Earn
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
@@ -14,12 +14,16 @@ import {
   Gamepad2,
   Plus,
   BarChart3,
-  Rocket,
+  DollarSign,
   Trophy,
   Users,
   ExternalLink,
   AlertCircle,
   Loader2,
+  Sparkles,
+  TrendingUp,
+  Eye,
+  Heart,
 } from "lucide-react";
 
 interface Game {
@@ -35,6 +39,8 @@ interface Game {
   status: string | null;
   is_draft: boolean;
   plays: number;
+  likes: number;
+  favorites: number;
   created_at: string;
 }
 
@@ -58,7 +64,6 @@ const Creator = () => {
   const [scores, setScores] = useState<
     { id: string; game_id: string; player_id: string; score: number; created_at: string }[]
   >([]);
-  const [stats, setStats] = useState({ totalGames: 0, totalScores: 0, totalPlayers: 0, totalPlays: 0 });
 
   // --- Actions ---
 
@@ -70,7 +75,6 @@ const Creator = () => {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     setMyGames((data as Game[]) ?? []);
-    setStats((s) => ({ ...s, totalGames: (data as Game[])?.length ?? 0 }));
   };
 
   const loadScores = async () => {
@@ -91,14 +95,9 @@ const Creator = () => {
       .select("*")
       .in("game_id", gameIds)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     setScores(scoresData ?? []);
-    setStats((s) => ({
-      ...s,
-      totalScores: scoresData?.length ?? 0,
-      totalPlayers: new Set(scoresData?.map((sc) => sc.player_id)).size ?? 0,
-    }));
   };
 
   useEffect(() => {
@@ -158,7 +157,7 @@ const Creator = () => {
       setTitle("");
       setDescription("");
       setGameplayJson('{\n  "difficulty": "medium",\n  "levels": 3\n}');
-      setSuccess(`Game "${data.title}" created successfully! Go to Publikasi tab to release it.`);
+      setSuccess(`Game "${data.title}" created! Go to My Games to publish it.`);
     } catch (err) {
       setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -182,13 +181,10 @@ const Creator = () => {
       return;
     }
 
-    const now = new Date();
-    const releasedAt = now.toISOString();
-
     const { error: releaseError } = await supabase
       .from("games")
       .update({
-        released_at: releasedAt,
+        released_at: new Date().toISOString(),
         version: (game.version ?? 1) + 1,
         status: "published",
         is_draft: false,
@@ -203,21 +199,30 @@ const Creator = () => {
     }
 
     const playUrl = `${window.location.origin}/play/${game.game_key}`;
-    setSuccess(`Game "${game.title}" released! Play at: ${playUrl}`);
+    setSuccess(`Game "${game.title}" is now live! Play at: ${playUrl}`);
 
     await loadMyGames();
   };
 
+  const totalPlays = myGames.reduce((sum, g) => sum + (g.plays || 0), 0);
+  const totalLikes = myGames.reduce((sum, g) => sum + (g.likes || 0), 0);
+  const totalFavorites = myGames.reduce((sum, g) => sum + (g.favorites || 0), 0);
+  const publishedCount = myGames.filter((g) => g.released_at).length;
+  const draftCount = myGames.filter((g) => !g.released_at).length;
+
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground mb-1">
-            Creator Studio
-          </h1>
-          <p className="font-body text-sm text-muted-foreground">
-            Build, publish, and track your games.
-          </p>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-2xl font-bold text-foreground">
+              Creator Studio
+            </h1>
+            <p className="font-body text-sm text-muted-foreground">
+              Build, publish, and monetize your games.
+            </p>
+          </div>
         </div>
 
         {/* Error/Success Messages */}
@@ -234,112 +239,76 @@ const Creator = () => {
           </Alert>
         )}
 
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
+        <Tabs defaultValue="create" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="create" className="flex items-center gap-1.5">
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Buat Game</span>
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Create</span>
             </TabsTrigger>
             <TabsTrigger value="games" className="flex items-center gap-1.5">
               <Gamepad2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Game Saya</span>
+              <span className="hidden sm:inline">My Games</span>
             </TabsTrigger>
-            <TabsTrigger value="scores" className="flex items-center gap-1.5">
-              <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">Data & Skor</span>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="publish" className="flex items-center gap-1.5">
-              <Rocket className="h-4 w-4" />
-              <span className="hidden sm:inline">Publikasi</span>
+            <TabsTrigger value="earn" className="flex items-center gap-1.5">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Earn</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Dashboard Tab */}
-          <TabsContent value="dashboard" className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/20 rounded-lg">
-                    <Gamepad2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-heading text-2xl font-bold text-foreground">
-                      {stats.totalGames}
-                    </p>
-                    <p className="font-body text-xs text-muted-foreground">Total Games</p>
-                  </div>
+          {/* CREATE TAB — AI-first, like Astrocade */}
+          <TabsContent value="create" className="space-y-6">
+            {/* AI Prompt Area */}
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/20 rounded-lg">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-heading text-sm font-bold text-foreground">
+                    Describe your game
+                  </h3>
+                  <p className="font-body text-xs text-muted-foreground">
+                    Tell AI what you want to create
+                  </p>
                 </div>
               </div>
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500/20 rounded-lg">
-                    <Users className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="font-heading text-2xl font-bold text-foreground">
-                      {stats.totalPlayers}
-                    </p>
-                    <p className="font-body text-xs text-muted-foreground">Unique Players</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-lg">
-                    <Trophy className="h-5 w-5 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className="font-heading text-2xl font-bold text-foreground">
-                      {stats.totalScores}
-                    </p>
-                    <p className="font-body text-xs text-muted-foreground">Scores Submitted</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/20 rounded-lg">
-                    <Gamepad2 className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div>
-                    <p className="font-heading text-2xl font-bold text-foreground">
-                      {myGames.reduce((sum, g) => sum + (g.plays || 0), 0)}
-                    </p>
-                    <p className="font-body text-xs text-muted-foreground">Total Plays</p>
-                  </div>
-                </div>
-              </div>
+              <Textarea
+                placeholder="e.g. A 2D platformer where you're a cat collecting fish in space..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full min-h-[100px]"
+              />
             </div>
 
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h3 className="font-heading text-sm font-bold text-foreground mb-2">Quick Actions</h3>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => navigate("/creator")}>
-                  <Plus className="h-4 w-4 mr-1" /> New Game
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate("/explore")}>
-                  Browse Games
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Buat Game Tab */}
-          <TabsContent value="create" className="space-y-4">
-            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-              <div>
-                <label className="font-body text-sm font-medium text-foreground block mb-1">
-                  Game Title
-                </label>
-                <Input
-                  placeholder="My Awesome Game"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
+            {/* Game Details Form */}
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+              <h3 className="font-heading text-sm font-bold text-foreground">
+                Game Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-body text-sm font-medium text-foreground block mb-1">
+                    Game Title
+                  </label>
+                  <Input
+                    placeholder="My Awesome Game"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="font-body text-sm font-medium text-foreground block mb-1">
+                    Genre
+                  </label>
+                  <Input
+                    placeholder="Platformer, Puzzle, RPG..."
+                    disabled
+                  />
+                </div>
               </div>
               <div>
                 <label className="font-body text-sm font-medium text-foreground block mb-1">
@@ -349,7 +318,7 @@ const Creator = () => {
                   placeholder="Describe your game..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               </div>
               <div>
@@ -380,42 +349,65 @@ const Creator = () => {
             </div>
           </TabsContent>
 
-          {/* Game Saya Tab */}
+          {/* MY GAMES TAB */}
           <TabsContent value="games" className="space-y-4">
             {myGames.length === 0 ? (
-              <div className="bg-card border border-border rounded-xl p-10 text-center">
+              <div className="bg-card border border-border rounded-2xl p-10 text-center">
                 <Gamepad2 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="font-body text-sm text-muted-foreground">
                   No games yet. Create your first game!
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {myGames.map((game) => (
                   <div
                     key={game.id}
-                    className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
+                    className="bg-card border border-border rounded-xl p-4 space-y-3"
                   >
-                    <div>
-                      <h3 className="font-heading text-sm font-bold text-foreground">
-                        {game.title}
-                      </h3>
-                      <p className="font-body text-xs text-muted-foreground">
-                        v{game.version} | {game.game_key}
-                      </p>
-                      {game.released_at ? (
-                        <p className="font-body text-xs text-green-500">
-                          Released: {new Date(game.released_at).toLocaleString()}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-heading text-sm font-bold text-foreground">
+                          {game.title}
+                        </h3>
+                        <p className="font-body text-xs text-muted-foreground">
+                          v{game.version} | {game.game_key}
                         </p>
-                      ) : (
-                        <p className="font-body text-xs text-yellow-500">Draft</p>
-                      )}
+                      </div>
+                      <span
+                        className={`font-body text-xs px-2 py-0.5 rounded-full ${
+                          game.released_at
+                            ? "bg-green-500/20 text-green-500"
+                            : "bg-yellow-500/20 text-yellow-500"
+                        }`}
+                      >
+                        {game.released_at ? "Live" : "Draft"}
+                      </span>
                     </div>
+
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        <span>{game.plays || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Heart className="h-3 w-3" />
+                        <span>{game.likes || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Trophy className="h-3 w-3" />
+                        <span>
+                          {scores.filter((s) => s.game_id === game.id).length}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="flex gap-2">
                       {game.released_at ? (
                         <Button
                           size="sm"
                           variant="outline"
+                          className="flex-1"
                           onClick={() => navigate(`/play/${game.game_key}`)}
                         >
                           <ExternalLink className="h-4 w-4 mr-1" /> Play
@@ -423,10 +415,21 @@ const Creator = () => {
                       ) : (
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => navigate("/creator")}
+                          className="flex-1"
+                          onClick={() => handleRelease(game.id)}
+                          disabled={releasing === game.id}
                         >
-                          <Rocket className="h-4 w-4 mr-1" /> Release
+                          {releasing === game.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Releasing...
+                            </>
+                          ) : (
+                            <>
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                              Publish
+                            </>
+                          )}
                         </Button>
                       )}
                     </div>
@@ -436,42 +439,110 @@ const Creator = () => {
             )}
           </TabsContent>
 
-          {/* Data & Skor Tab */}
-          <TabsContent value="scores" className="space-y-4">
-            {scores.length === 0 ? (
-              <div className="bg-card border border-border rounded-xl p-10 text-center">
-                <Trophy className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <p className="font-body text-sm text-muted-foreground">
-                  No scores submitted yet.
-                </p>
+          {/* ANALYTICS TAB */}
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-card border border-border rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Eye className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-2xl font-bold text-foreground">
+                      {totalPlays}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">Total Plays</p>
+                  </div>
+                </div>
               </div>
-            ) : (
+              <div className="bg-card border border-border rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Heart className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-2xl font-bold text-foreground">
+                      {totalLikes}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">Total Likes</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Users className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-2xl font-bold text-foreground">
+                      {publishedCount}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">Published</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                    <Trophy className="h-5 w-5 text-yellow-500" />
+                  </div>
+                  <div>
+                    <p className="font-heading text-2xl font-bold text-foreground">
+                      {scores.length}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">Scores</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Game Performance Table */}
+            {myGames.length > 0 && (
               <div className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <h3 className="font-heading text-sm font-bold text-foreground">
+                    Game Performance
+                  </h3>
+                </div>
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="font-body text-xs font-medium text-muted-foreground text-left px-4 py-3">
-                        Player
+                        Game
                       </th>
                       <th className="font-body text-xs font-medium text-muted-foreground text-left px-4 py-3">
-                        Score
+                        Plays
                       </th>
                       <th className="font-body text-xs font-medium text-muted-foreground text-left px-4 py-3">
-                        Date
+                        Likes
+                      </th>
+                      <th className="font-body text-xs font-medium text-muted-foreground text-left px-4 py-3">
+                        Status
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {scores.map((score) => (
-                      <tr key={score.id} className="border-b border-border last:border-0">
+                    {myGames.map((game) => (
+                      <tr key={game.id} className="border-b border-border last:border-0">
                         <td className="font-body text-sm text-foreground px-4 py-3">
-                          {score.player_id.slice(0, 8)}...
+                          {game.title}
                         </td>
                         <td className="font-body text-sm text-foreground px-4 py-3">
-                          {score.score}
+                          {game.plays || 0}
                         </td>
-                        <td className="font-body text-sm text-muted-foreground px-4 py-3">
-                          {new Date(score.created_at).toLocaleString()}
+                        <td className="font-body text-sm text-foreground px-4 py-3">
+                          {game.likes || 0}
+                        </td>
+                        <td className="font-body text-sm px-4 py-3">
+                          <span
+                            className={`font-body text-xs px-2 py-0.5 rounded-full ${
+                              game.released_at
+                                ? "bg-green-500/20 text-green-500"
+                                : "bg-yellow-500/20 text-yellow-500"
+                            }`}
+                          >
+                            {game.released_at ? "Live" : "Draft"}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -481,88 +552,36 @@ const Creator = () => {
             )}
           </TabsContent>
 
-          {/* Publikasi Tab */}
-          <TabsContent value="publish" className="space-y-4">
-            {myGames.filter((g) => !g.released_at).length === 0 ? (
-              <div className="bg-card border border-border rounded-xl p-10 text-center">
-                <Rocket className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <p className="font-body text-sm text-muted-foreground">
-                  All games are released. Create a new one to publish!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {myGames
-                  .filter((g) => !g.released_at)
-                  .map((game) => (
-                    <div
-                      key={game.id}
-                      className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-                    >
-                      <div>
-                        <h3 className="font-heading text-sm font-bold text-foreground">
-                          {game.title}
-                        </h3>
-                        <p className="font-body text-xs text-muted-foreground">
-                          v{game.version} | Draft
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleRelease(game.id)}
-                        disabled={releasing === game.id}
-                      >
-                        {releasing === game.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Releasing...
-                          </>
-                        ) : (
-                          <>
-                            <Rocket className="h-4 w-4 mr-1" />
-                            Rilis
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {/* Published games */}
-            {myGames.filter((g) => g.released_at).length > 0 && (
-              <>
-                <h3 className="font-heading text-sm font-bold text-foreground mt-6">
-                  Published Games
-                </h3>
-                <div className="space-y-3">
-                  {myGames
-                    .filter((g) => g.released_at)
-                    .map((game) => (
-                      <div
-                        key={game.id}
-                        className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-                      >
-                        <div>
-                          <h3 className="font-heading text-sm font-bold text-foreground">
-                            {game.title}
-                          </h3>
-                          <p className="font-body text-xs text-green-500">
-                            v{game.version} | Live
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(`/play/${game.game_key}`)}
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" /> Play
-                        </Button>
-                      </div>
-                    ))}
+          {/* EARN TAB */}
+          <TabsContent value="earn" className="space-y-4">
+            <div className="bg-card border border-border rounded-2xl p-8 text-center">
+              <DollarSign className="h-12 w-12 text-primary mx-auto mb-4" />
+              <h3 className="font-heading text-lg font-bold text-foreground mb-2">
+                Earn from Your Games
+              </h3>
+              <p className="font-body text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Monetize your games with in-game purchases, ads, and premium features.
+                Revenue sharing coming soon.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+                <div className="bg-secondary rounded-lg p-4">
+                  <p className="font-heading text-xl font-bold text-foreground">
+                    {totalPlays}
+                  </p>
+                  <p className="font-body text-xs text-muted-foreground">Total Plays</p>
                 </div>
-              </>
-            )}
+                <div className="bg-secondary rounded-lg p-4">
+                  <p className="font-heading text-xl font-bold text-foreground">
+                    {publishedCount}
+                  </p>
+                  <p className="font-body text-xs text-muted-foreground">Live Games</p>
+                </div>
+                <div className="bg-secondary rounded-lg p-4">
+                  <p className="font-heading text-xl font-bold text-foreground">$0</p>
+                  <p className="font-body text-xs text-muted-foreground">Revenue</p>
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
