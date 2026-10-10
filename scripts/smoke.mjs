@@ -9,7 +9,11 @@ const page = await browser.newPage();
 const issues = [];
 
 page.on("console", (msg) => {
-  if (msg.type() === "error") issues.push(`[console] ${msg.text()}`);
+  if (msg.type() !== "error") return;
+  const text = msg.text();
+  // NotFound.tsx intentionally logs a 404 for the /nope route check
+  if (text.includes("non-existent route")) return;
+  issues.push(`[console] ${text}`);
 });
 page.on("pageerror", (err) => issues.push(`[pageerror] ${err.message}`));
 
