@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/RequireAuth";
+import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
 import Create from "./pages/Create";
@@ -26,7 +27,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Library />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<Create />} />
             <Route path="/friends" element={<Friends />} />
