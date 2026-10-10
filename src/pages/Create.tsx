@@ -23,7 +23,7 @@ const tools = [
   {
     icon: Zap,
     title: "Jabali Engine",
-    description: "Physics, lighting, and AI behavior systems out of the box. Publish to NEXPLAY with one click.",
+    description: "Physics, lighting, and AI behavior systems out of the box. Publish to NEXPLAY.AI with one click.",
     tag: null,
   },
 ];

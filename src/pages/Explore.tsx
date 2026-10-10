@@ -30,7 +30,7 @@ const Explore = () => {
       <GameRow
         title="🎮 All Games"
         isEmpty
-        emptyMessage="No games have been created yet. Be the first creator on NEXPLAY!"
+        emptyMessage="No games have been created yet. Be the first creator on NEXPLAY.AI!"
       >
         {null}
       </GameRow>
