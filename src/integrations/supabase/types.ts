@@ -47,6 +47,78 @@ export type Database = {
         }
         Relationships: []
       }
+      age_verifications: {
+        Row: {
+          bracket: string
+          captcha_passed: boolean
+          created_at: string
+          declared_age: number
+          dev_agreement_accepted: boolean
+          device_hash: string
+          guardian_acknowledged: boolean
+          id: string
+          parental_control_notice: boolean
+          policy_accepted: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bracket: string
+          captcha_passed?: boolean
+          created_at?: string
+          declared_age: number
+          dev_agreement_accepted?: boolean
+          device_hash: string
+          guardian_acknowledged?: boolean
+          id?: string
+          parental_control_notice?: boolean
+          policy_accepted?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bracket?: string
+          captcha_passed?: boolean
+          created_at?: string
+          declared_age?: number
+          dev_agreement_accepted?: boolean
+          device_hash?: string
+          guardian_acknowledged?: boolean
+          id?: string
+          parental_control_notice?: boolean
+          policy_accepted?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creator_agreements: {
+        Row: {
+          accepted_at: string
+          declared_age: number | null
+          device_hash: string | null
+          policy_version: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          declared_age?: number | null
+          device_hash?: string | null
+          policy_version: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          declared_age?: number | null
+          device_hash?: string | null
+          policy_version?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
