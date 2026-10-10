@@ -1,5 +1,5 @@
-// Creator.tsx — Creator Studio inspired by Astrocade's clean AI-first design.
-// Tabs: Create | My Games | Analytics | Earn
+// Creator.tsx — Creator Studio with Free/Pro tier system.
+// Free: max 3 games. Pro: one-time top-up for unlimited games.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
@@ -24,7 +24,13 @@ import {
   TrendingUp,
   Eye,
   Heart,
+  Crown,
+  Lock,
+  Check,
 } from "lucide-react";
+
+const FREE_TIER_LIMIT = 3;
+const PRO_PRICE_CENTS = 499; // $4.99
 
 interface Game {
   id: string;
@@ -45,8 +51,11 @@ interface Game {
 }
 
 const Creator = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+
+  const creatorTier = profile?.creator_tier ?? "free";
+  const isPro = creatorTier === "pro";
 
   // Form state
   const [title, setTitle] = useState("");
@@ -54,6 +63,7 @@ const Creator = () => {
   const [gameplayJson, setGameplayJson] = useState('{\n  "difficulty": "medium",\n  "levels": 3\n}');
   const [releasing, setReleasing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   // Error/success messages
   const [error, setError] = useState<string | null>(null);
@@ -105,8 +115,56 @@ const Creator = () => {
     loadScores();
   }, [user]);
 
+  const handleUpgradeToPro = async () => {
+    if (!user) return;
+    setUpgrading(true);
+    setError(null);
+
+    try {
+      // Record the purchase
+      const { error: purchaseError } = await supabase.from("creator_purchases").insert({
+        user_id: user.id,
+        tier: "pro",
+        amount_cents: PRO_PRICE_CENTS,
+        status: "completed",
+      });
+
+      if (purchaseError) {
+        setError(`Failed to process upgrade: ${purchaseError.message}`);
+        setUpgrading(false);
+        return;
+      }
+
+      // Update profile to pro
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ creator_tier: "pro" })
+        .eq("user_id", user.id);
+
+      if (profileError) {
+        setError(`Failed to update profile: ${profileError.message}`);
+        setUpgrading(false);
+        return;
+      }
+
+      setSuccess("Welcome to Pro! You now have unlimited game creation.");
+      // Reload profile
+      window.location.reload();
+    } catch (err) {
+      setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   const handleCreateGame = async () => {
     if (!user || !title.trim()) return;
+
+    // Check free tier limit
+    if (!isPro && myGames.length >= FREE_TIER_LIMIT) {
+      setError(`Free tier limited to ${FREE_TIER_LIMIT} games. Upgrade to Pro for unlimited creation.`);
+      return;
+    }
 
     setError(null);
     setSuccess(null);
@@ -157,7 +215,7 @@ const Creator = () => {
       setTitle("");
       setDescription("");
       setGameplayJson('{\n  "difficulty": "medium",\n  "levels": 3\n}');
-      setSuccess(`Game "${data.title}" created! Go to My Games to publish it.`);
+      setSuccess(`Game "${data.title}" created!`);
     } catch (err) {
       setError(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -206,14 +264,14 @@ const Creator = () => {
 
   const totalPlays = myGames.reduce((sum, g) => sum + (g.plays || 0), 0);
   const totalLikes = myGames.reduce((sum, g) => sum + (g.likes || 0), 0);
-  const totalFavorites = myGames.reduce((sum, g) => sum + (g.favorites || 0), 0);
   const publishedCount = myGames.filter((g) => g.released_at).length;
   const draftCount = myGames.filter((g) => !g.released_at).length;
+  const gamesRemaining = isPro ? Infinity : Math.max(0, FREE_TIER_LIMIT - myGames.length);
 
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header with tier badge */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading text-2xl font-bold text-foreground">
@@ -222,6 +280,16 @@ const Creator = () => {
             <p className="font-body text-sm text-muted-foreground">
               Build, publish, and monetize your games.
             </p>
+          </div>
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-body text-sm font-semibold ${
+              isPro
+                ? "bg-primary/20 text-primary"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            <Crown className="h-4 w-4" />
+            {isPro ? "Pro Creator" : "Free Creator"}
           </div>
         </div>
 
@@ -237,6 +305,59 @@ const Creator = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{success}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Free tier limit banner */}
+        {!isPro && (
+          <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-500/20 rounded-lg">
+                <Lock className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="font-body text-sm font-medium text-foreground">
+                  Free tier: {myGames.length}/{FREE_TIER_LIMIT} games used
+                </p>
+                <p className="font-body text-xs text-muted-foreground">
+                  Upgrade to Pro for unlimited game creation
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleUpgradeToPro}
+              disabled={upgrading}
+            >
+              {upgrading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Upgrading...
+                </>
+              ) : (
+                <>
+                  <Crown className="h-4 w-4 mr-1" />
+                  Upgrade $4.99
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Pro tier banner */}
+        {isPro && (
+          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center gap-3">
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Crown className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-body text-sm font-medium text-foreground">
+                Pro Creator — Unlimited game creation
+              </p>
+              <p className="font-body text-xs text-muted-foreground">
+                You have full access to all creator features
+              </p>
+            </div>
+          </div>
         )}
 
         <Tabs defaultValue="create" className="w-full">
@@ -259,7 +380,7 @@ const Creator = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* CREATE TAB — AI-first, like Astrocade */}
+          {/* CREATE TAB */}
           <TabsContent value="create" className="space-y-6">
             {/* AI Prompt Area */}
             <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
@@ -286,9 +407,21 @@ const Creator = () => {
 
             {/* Game Details Form */}
             <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-              <h3 className="font-heading text-sm font-bold text-foreground">
-                Game Details
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-heading text-sm font-bold text-foreground">
+                  Game Details
+                </h3>
+                {!isPro && (
+                  <span className="font-body text-xs text-muted-foreground">
+                    {gamesRemaining} of {FREE_TIER_LIMIT} slots remaining
+                  </span>
+                )}
+                {isPro && (
+                  <span className="font-body text-xs text-primary flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Unlimited
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="font-body text-sm font-medium text-foreground block mb-1">
@@ -304,10 +437,7 @@ const Creator = () => {
                   <label className="font-body text-sm font-medium text-foreground block mb-1">
                     Genre
                   </label>
-                  <Input
-                    placeholder="Platformer, Puzzle, RPG..."
-                    disabled
-                  />
+                  <Input placeholder="Platformer, Puzzle, RPG..." disabled />
                 </div>
               </div>
               <div>
@@ -333,7 +463,10 @@ const Creator = () => {
                   className="font-mono text-sm"
                 />
               </div>
-              <Button onClick={handleCreateGame} disabled={!title.trim() || creating}>
+              <Button
+                onClick={handleCreateGame}
+                disabled={!title.trim() || creating || (!isPro && myGames.length >= FREE_TIER_LIMIT)}
+              >
                 {creating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -496,7 +629,6 @@ const Creator = () => {
               </div>
             </div>
 
-            {/* Game Performance Table */}
             {myGames.length > 0 && (
               <div className="bg-card border border-border rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-border">
@@ -561,7 +693,6 @@ const Creator = () => {
               </h3>
               <p className="font-body text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Monetize your games with in-game purchases, ads, and premium features.
-                Revenue sharing coming soon.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
                 <div className="bg-secondary rounded-lg p-4">

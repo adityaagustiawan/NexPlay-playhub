@@ -12,6 +12,7 @@ interface AuthContextType {
     bio: string | null;
     coins: number;
     role: string | null;
+    creator_tier: string | null;
   } | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -35,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("display_name, avatar_url, bio, coins, role")
+      .select("display_name, avatar_url, bio, coins, role, creator_tier")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) {
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     // Rows created before the profiles migration/trigger existed can be missing.
-    setProfile(data ?? { display_name: null, avatar_url: null, bio: null, coins: 0, role: null });
+    setProfile(data ?? { display_name: null, avatar_url: null, bio: null, coins: 0, role: null, creator_tier: null });
   };
 
   const refreshProfile = async () => {
