@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { authErrorMessage, friendlyAuthError } from "@/lib/authError";
 import { NavLink } from "@/components/NavLink";
 import { LogIn, Mail, Lock, Eye, EyeOff, Gamepad2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
