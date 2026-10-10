@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/AppLayout";
 import { topUpPackages } from "@/data/gameData";
 import { useAuth } from "@/hooks/useAuth";
-import { Coins, Zap, Gift, AlertCircle, Loader2, CheckCircle2, Info } from "lucide-react";
+import { Coins, Zap, Gift, AlertCircle, Loader2, CheckCircle2, Info, Crown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const TopUp = () => {
@@ -14,6 +14,7 @@ const TopUp = () => {
   const params = new URLSearchParams(window.location.search);
   const justPaid = params.get("success") === "1";
   const cancelled = params.get("cancelled") === "1";
+  const unlockPro = params.get("unlock") === "pro";
 
   useEffect(() => {
     if (justPaid) {
@@ -73,6 +74,16 @@ const TopUp = () => {
           <Info className="h-5 w-5 text-muted-foreground shrink-0" />
           <p className="font-body text-sm text-muted-foreground">
             Checkout cancelled — nothing was charged and no coins were added.
+          </p>
+        </div>
+      )}
+      {unlockPro && !justPaid && (
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-6 flex items-start gap-3 max-w-2xl">
+          <Crown className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <p className="font-body text-sm text-foreground">
+            <span className="font-semibold">Unlock Pro Creator.</span> Complete any
+            top-up once and you'll get unlimited game creation in Creator Studio —
+            no subscription, no recurring charge.
           </p>
         </div>
       )}

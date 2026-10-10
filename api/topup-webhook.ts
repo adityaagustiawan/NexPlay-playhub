@@ -95,13 +95,28 @@ async function creditCoins(input: {
     .maybeSingle();
 
   const current = typeof profile?.coins === "number" ? profile.coins : 0;
+  // Any completed top-up also unlocks Pro creator (unlimited game creation).
+  // This is the only place creator_tier is promoted — clients cannot set it.
   const { error } = await admin
     .from("profiles")
-    .update({ coins: current + input.coins })
+    .update({ coins: current + input.coins, creator_tier: "pro" })
     .eq("user_id", input.userId);
 
   if (error) {
     throw error;
+  }
+
+  // Audit trail: record the one-time Pro unlock alongside the coin ledger.
+  // Idempotent because this only runs after the topup_payments insert succeeds.
+  const { error: purchaseError } = await admin.from("creator_purchases").insert({
+    user_id: input.userId,
+    tier: "pro",
+    amount_cents: input.amountCents,
+    status: "completed",
+  });
+  if (purchaseError) {
+    // Non-fatal: coins + tier are already granted, so don't fail the webhook.
+    console.error("recording creator purchase failed:", purchaseError);
   }
 }
 
