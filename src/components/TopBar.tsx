@@ -1,4 +1,4 @@
-import { Search, Bell, Users, MessageSquare, Menu } from "lucide-react";
+import { Search, Bell, Users, MessageSquare, Menu, Gamepad2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,8 +17,11 @@ export function TopBar({ onMenuToggle }: TopBarProps) {
       </button>
 
       {/* Logo — mobile only */}
-      <span className="md:hidden font-heading text-lg font-bold text-foreground">
-        <span className="text-primary">NEX</span>PLAY<span className="text-primary">.AI</span>
+      <span className="md:hidden flex items-center gap-1.5 font-heading text-lg font-bold text-foreground">
+        <Gamepad2 className="h-5 w-5 text-primary" />
+        <span>
+          <span className="text-primary">NEX</span>CONSOLE
+        </span>
       </span>
 
       {/* Search */}

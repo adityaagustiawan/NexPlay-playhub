@@ -34,7 +34,7 @@ const Login = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Gamepad2 className="h-8 w-8 text-primary" />
             <h1 className="font-heading text-2xl font-bold text-foreground">
-              <span className="text-primary">NEX</span>PLAY<span className="text-primary">.AI</span>
+              <span className="text-primary">NEX</span>CONSOLE
             </h1>
           </div>
           <p className="font-body text-muted-foreground">Welcome back, player</p>
