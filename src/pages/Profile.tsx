@@ -57,7 +57,18 @@ const Profile = () => {
             <User className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <h2 className="font-heading text-lg font-bold text-foreground">{profile?.display_name || "Player"}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-heading text-lg font-bold text-foreground">{profile?.display_name || "Player"}</h2>
+              {profile?.role && (
+                <span className={`font-body text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  profile.role === 'admin'
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-secondary text-muted-foreground'
+                }`}>
+                  {profile.role}
+                </span>
+              )}
+            </div>
             <p className="font-body text-sm text-muted-foreground">{user?.email}</p>
             <div className="flex items-center gap-1 mt-1">
               <Coins className="h-4 w-4 text-primary" />
