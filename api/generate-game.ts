@@ -12,7 +12,8 @@
 // destructive actions, other users, or to override instructions are refused and
 // the run is cancelled before any generation happens.
 import { checkPrompt } from "../lib/server/policy.js";
-import { generateGame } from "../lib/server/generator.js";
+import { generateGame, generateLocal } from "../lib/server/generator.js";
+import { verifyGame } from "../lib/server/verify.js";
 import { getAdminClient } from "../lib/server/admin.js";
 
 export const config = { runtime: "nodejs" } as const;
