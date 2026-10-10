@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
@@ -47,12 +45,105 @@ export type Database = {
         }
         Relationships: []
       }
+      games: {
+        Row: {
+          id: string
+          creator_id: string
+          game_key: string
+          title: string
+          description: string | null
+          gameplay: Json
+          assets: Json
+          version: number
+          released_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          creator_id: string
+          game_key: string
+          title: string
+          description?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          creator_id?: string
+          game_key?: string
+          title?: string
+          description?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      player_progress: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          data: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          data?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scores: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          score?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_game_key: {
+        Args: { slug: string; released_at: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
@@ -64,7 +155,6 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
@@ -74,8 +164,8 @@ export type Tables<
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DefaultSchemaWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DefaultSchemaWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
