@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
@@ -47,12 +45,138 @@ export type Database = {
         }
         Relationships: []
       }
+      games: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          image_url: string | null
+          plays: number
+          likes: number
+          favorites: number
+          created_at: string
+          updated_at: string
+          status: string | null
+          studio_data: Json
+          is_draft: boolean
+          engine_type: string | null
+          game_url: string | null
+          external_id: string | null
+          is_external: boolean
+          game_key: string | null
+          gameplay: Json
+          assets: Json
+          version: number
+          released_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          description?: string | null
+          image_url?: string | null
+          plays?: number
+          likes?: number
+          favorites?: number
+          created_at?: string
+          updated_at?: string
+          status?: string | null
+          studio_data?: Json
+          is_draft?: boolean
+          engine_type?: string | null
+          game_url?: string | null
+          external_id?: string | null
+          is_external?: boolean
+          game_key?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          description?: string | null
+          image_url?: string | null
+          plays?: number
+          likes?: number
+          favorites?: number
+          created_at?: string
+          updated_at?: string
+          status?: string | null
+          studio_data?: Json
+          is_draft?: boolean
+          engine_type?: string | null
+          game_url?: string | null
+          external_id?: string | null
+          is_external?: boolean
+          game_key?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+        }
+        Relationships: []
+      }
+      player_progress: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          data: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          data?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scores: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          score?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_game_key: {
+        Args: { slug: string; released_at: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
@@ -64,7 +188,6 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<

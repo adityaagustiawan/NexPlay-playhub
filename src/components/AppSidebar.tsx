@@ -1,7 +1,8 @@
-import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2 } from "lucide-react";
+import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2, Wrench } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 import { BetaBadge } from "@/components/BetaBadge";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { title: "Home", url: "/library", icon: Home },
@@ -16,6 +17,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, onClose }: AppSidebarProps) {
+  const { user } = useAuth();
+
   return (
     <>
       {/* Mobile overlay */}
@@ -69,6 +72,17 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
               <span className="font-body text-sm font-medium">{item.title}</span>
             </NavLink>
           ))}
+          {user && (
+            <NavLink
+              to="/creator"
+              className="flex items-center gap-3 px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
+              activeClassName="bg-secondary text-foreground"
+              onClick={onClose}
+            >
+              <Wrench className="h-5 w-5" />
+              <span className="font-body text-sm font-medium">Creator</span>
+            </NavLink>
+          )}
         </div>
 
         {/* User */}
