@@ -32,6 +32,7 @@ import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPan
 import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
 import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
 import { useBlenderInput } from "@/hooks/useBlenderInput";
+import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
 import {
   AlertTriangle,
   Box,
@@ -395,7 +396,7 @@ const Studio = () => {
       },
     },
     { id: "file.new", label: "File: New Game", hint: "Ctrl+N", run: newGame },
-    { id: "view.frame_all", label: "View: Frame All", hint: "Numpad .", run: () => viewportRef.current?.frameAll() },
+    { id: "view.frame_all", label: "View: Frame All", hint: "Numpad . / Home", run: () => viewportRef.current?.frameAll() },
     { id: "view.front", label: "View: Front", hint: "Numpad 1", run: () => viewportRef.current?.setView("front") },
     { id: "view.right", label: "View: Right", hint: "Numpad 3", run: () => viewportRef.current?.setView("right") },
     { id: "view.top", label: "View: Top", hint: "Numpad 7", run: () => viewportRef.current?.setView("top") },
@@ -458,6 +459,9 @@ const Studio = () => {
           break;
         case "0":
           viewportRef.current?.setView("camera");
+          break;
+        case "Home":
+          viewportRef.current?.frameAll();
           break;
         default:
           break;
@@ -907,9 +911,8 @@ const Studio = () => {
 
       {/* ---- Main area ---- */}
       <div className="flex min-h-0 flex-1">
-        {/* Viewport editor */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Viewport header */}
+          {/* Viewport header (shared across workspaces) */}
           <div className="flex h-7 shrink-0 items-center gap-1 border-b border-[#1d1d1d] bg-[#303030] px-2">
             <StudioMenu
               label={editMode}
@@ -921,6 +924,7 @@ const Studio = () => {
                 onSelect: () => setEditMode(m),
               }))}
             />
+            {topMenus ? null : null}
             {headerMenus.map((m) => (
               <StudioMenu
                 key={m.label}
@@ -949,64 +953,55 @@ const Studio = () => {
             </div>
           </div>
 
-          {/* Viewport body */}
-          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
-            {/* Tool column */}
-            {showToolbar && (
-              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-                {TOOLS.map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <button key={t.label} type="button" title={t.label} onClick={() => setTool(t.label)} className={iconBtn(tool === t.label)}>
-                      <Icon className="h-4 w-4" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {/* Overlay text */}
-            <div className={`pointer-events-none absolute top-2 z-10 text-[10px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
-              (1) Scene Collection | {editMode}
-            </div>
-            <div className={`pointer-events-none absolute bottom-2 z-10 text-[10px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
-              {dimension === "3d" ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel: zoom" : `${config.mode} view · ${config.dimension.toUpperCase()}`}
-            </div>
-
-            {/* Content: 2D canvas or 3D world */}
-            <div key={`${dimension}-${nonce}`} className="h-full w-full">
-              {dimension === "3d" ? (
-                <Viewport3D ref={viewportRef} mode={config.mode} goal={config.goal} theme={config.theme} />
-              ) : (
-                <GamePreview
-                  fill
-                  pkg={pkg}
-                  title={config.title || "Untitled"}
-                  onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined}
+          {/* Workspace content */}
+          <WorkspaceRenderer
+            workspace={workspace as any}
+            config={config}
+            pkg={pkg}
+            record={record}
+            dimension={dimension}
+            nonce={nonce}
+            selected={selected}
+            onSelect={setSelected}
+            propTab={propTab}
+            setPropTab={setPropTab}
+            propTabs={PROP_TABS}
+            propertiesContent={propertiesContent}
+            showPanels={showPanels}
+            showToolbar={showToolbar}
+            editMode={editMode}
+            tool={tool}
+            setTool={setTool}
+            shading={shading}
+            headerMenus={headerMenus}
+            headerMenusRender={() => (
+              <>
+                <StudioMenu
+                  label={editMode}
+                  align="start"
+                  triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#d0d0d0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
+                  items={["Object Mode", "Edit Mode", "Sculpt Mode", "Vertex Paint"].map((m) => ({
+                    label: m,
+                    checked: editMode === m,
+                    onSelect: () => setEditMode(m),
+                  }))}
                 />
-              )}
-            </div>
-          </div>
+                {headerMenus.map((m) => (
+                  <StudioMenu
+                    key={m.label}
+                    label={m.label}
+                    items={m.items}
+                    triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
+                  />
+                ))}
+              </>
+            )}
+            tools={TOOLS}
+            viewportRef={viewportRef}
+            viewportBodyRef={viewportBodyRef}
+            renderViewport={() => null}
+          />
         </div>
-
-        {/* Right column: Outliner + Properties */}
-        {showPanels && (
-          <div className="hidden w-[300px] shrink-0 flex-col border-l border-black md:flex">
-            <div className="h-44 min-h-0 shrink-0 overflow-hidden border-b border-black bg-[#303030]">
-              <Outliner
-                title={config.title}
-                mode={config.mode}
-                selected={selected}
-                onSelect={(k) => {
-                  setSelected(k);
-                  setPropTab("object");
-                }}
-              />
-            </div>
-            <PropertiesPanel tabs={PROP_TABS} active={propTab} onChange={setPropTab}>
-              {propertiesContent()}
-            </PropertiesPanel>
-          </div>
-        )}
       </div>
 
       {/* ---- Status bar ---- */}
