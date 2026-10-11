@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Home,
   Compass,
@@ -32,13 +33,23 @@ interface AppSidebarProps {
 
 export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse }: AppSidebarProps) {
   const { user } = useAuth();
+  // When the rail is collapsed, hovering temporarily expands it as an overlay
+  // ("peek") so labels are readable without pinning the sidebar open.
+  const [peeking, setPeeking] = useState(false);
+
+  useEffect(() => {
+    // Drop the peek if the sidebar is expanded (labels are already visible).
+    if (!collapsed) setPeeking(false);
+  }, [collapsed]);
+
+  const railCollapsed = collapsed && !peeking;
 
   // Width: mobile drawer stays 220px; desktop switches between 220px and 72px.
-  const navWidth = collapsed ? "w-[220px] md:w-[72px]" : "w-[220px] md:w-[220px]";
+  const navWidth = railCollapsed ? "w-[220px] md:w-[72px]" : "w-[220px] md:w-[220px]";
   // Hide text labels only when collapsed ON DESKTOP (md+), so the mobile drawer
   // still shows words.
-  const label = collapsed ? "md:hidden" : "";
-  const iconRow = collapsed ? "md:justify-center md:gap-0 md:px-2" : "gap-3";
+  const label = railCollapsed ? "md:hidden" : "";
+  const iconRow = railCollapsed ? "md:justify-center md:gap-0 md:px-2" : "gap-3";
 
   return (
     <>
@@ -48,6 +59,8 @@ export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse 
       )}
 
       <nav
+        onMouseEnter={() => collapsed && setPeeking(true)}
+        onMouseLeave={() => setPeeking(false)}
         className={`fixed left-0 top-0 h-screen ${navWidth} bg-sidebar border-r border-border flex flex-col py-5 z-50 transition-[transform,width] duration-200
           ${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
