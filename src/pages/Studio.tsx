@@ -36,8 +36,13 @@ import { WorkspaceRenderer, type Workspace } from "@/components/studio/Workspace
 import { AIAssistant } from "@/components/studio/AIAssistant";
 import { MusePromptBar } from "@/components/studio/MusePromptBar";
 import { ResizeGrip } from "@/components/studio/ResizeGrip";
+import { StudioIntro } from "@/components/studio/StudioIntro";
+import { StudioTour } from "@/components/studio/StudioTour";
+import { BuildProgress } from "@/components/studio/BuildProgress";
+import { Tip } from "@/components/studio/Tip";
 import { useMuse } from "@/hooks/useMuse";
-import { useStoredNumber } from "@/hooks/useStoredNumber";
+import { useStoredNumber, useStoredFlag } from "@/hooks/useStoredNumber";
+import { clearOnboarded, hasOnboarded, markOnboarded } from "@/lib/onboarding";
 import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
@@ -70,23 +75,35 @@ import {
 
 const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "Scripting"];
 
+// Minimum time the "asset import" build overlay stays visible when saving.
+const BUILD_MIN_MS = 1600;
+
+const TOOL_TIPS: Record<string, string> = {
+  Layout: "Model, script and preview — the default Blender-style layout.",
+  Modeling: "Edit the mesh and object transforms.",
+  Shading: "Materials, textures and the image editor.",
+  Animation: "Dope sheet, graph editor and timeline.",
+  Rendering: "Node editor, output and render settings.",
+  Scripting: "Write and run game logic in the console.",
+};
+
 const TOOLS = [
-  { icon: MousePointer2, label: "Select Box" },
-  { icon: Circle, label: "Cursor" },
-  { icon: Move, label: "Move" },
-  { icon: RotateCw, label: "Rotate" },
-  { icon: Maximize2, label: "Scale" },
-  { icon: Ruler, label: "Measure" },
-  { icon: PenTool, label: "Annotate" },
-  { icon: Crosshair, label: "Add" },
-  { icon: Plus, label: "Add Object" },
+  { icon: MousePointer2, label: "Select Box", shortcut: "B", tip: "Box-select objects by dragging in the viewport." },
+  { icon: Circle, label: "Cursor", shortcut: "Shift+Space", tip: "Place the 3D cursor — new objects spawn from it." },
+  { icon: Move, label: "Move", shortcut: "G", tip: "Grab the selected object and move it." },
+  { icon: RotateCw, label: "Rotate", shortcut: "R", tip: "Rotate the selected object around its pivot." },
+  { icon: Maximize2, label: "Scale", shortcut: "S", tip: "Resize the selected object." },
+  { icon: Ruler, label: "Measure", shortcut: "M", tip: "Measure distances between points in the viewport." },
+  { icon: PenTool, label: "Annotate", shortcut: "D", tip: "Draw freehand notes on the viewport." },
+  { icon: Crosshair, label: "Add", shortcut: "Shift+A", tip: "Add a new object at the cursor." },
+  { icon: Plus, label: "Add Object", tip: "Add a game object — player, pickups or hazards." },
 ];
 
 const SHADING = [
-  { id: "wire", icon: Circle, label: "Wireframe" },
-  { id: "solid", icon: Square, label: "Solid" },
-  { id: "mat", icon: Sun, label: "Material Preview" },
-  { id: "rend", icon: Camera, label: "Rendered" },
+  { id: "wire", icon: Circle, label: "Wireframe", tip: "Show edges only." },
+  { id: "solid", icon: Square, label: "Solid", tip: "Default shaded viewport." },
+  { id: "mat", icon: Sun, label: "Material Preview", tip: "Preview materials with a studio light." },
+  { id: "rend", icon: Camera, label: "Rendered", tip: "Full render preview." },
 ];
 
 const PROP_TABS: PropTab[] = [
@@ -146,7 +163,7 @@ const NexPlayLogo = () => (
 );
 
 const Studio = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const gameKeyParam = params.get("game");
@@ -179,6 +196,18 @@ const Studio = () => {
   const [museWidth, setMuseWidth] = useStoredNumber("nexstudio_muse_w", 340);
   const [panelWidth, setPanelWidth] = useStoredNumber("nexstudio_panel_w", 320);
   const [outlinerHeight, setOutlinerHeight] = useStoredNumber("nexstudio_outliner_h", 200);
+
+  // Preferences & first-run onboarding.
+  const [showTips, setShowTips] = useStoredFlag("nexstudio_tips", true);
+  const [showIntro, setShowIntro] = useState(false);
+  const [introFirstRun, setIntroFirstRun] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [onboardReady, setOnboardReady] = useState(false);
+  const [build, setBuild] = useState<{ active: boolean; complete: boolean; mode: "save" | "publish" }>({
+    active: false,
+    complete: false,
+    mode: "save",
+  });
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -244,6 +273,25 @@ const Studio = () => {
     refreshMyGames();
   }, [refreshMyGames]);
 
+  // First-run onboarding: the opening animation shows on every open, and the
+  // full "how to use" tour only the first time this account opens the studio.
+  useEffect(() => {
+    if (authLoading || onboardReady) return;
+    setOnboardReady(true);
+    setIntroFirstRun(!hasOnboarded(user?.id));
+    setShowIntro(true);
+  }, [authLoading, onboardReady, user?.id]);
+
+  const finishIntro = useCallback(() => {
+    setShowIntro(false);
+    if (introFirstRun) setTourOpen(true);
+  }, [introFirstRun]);
+
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
+    markOnboarded(user?.id);
+  }, [user?.id]);
+
   const pkg: GamePackage = useMemo(
     () => ({
       gameplay: buildGameplay(config),
@@ -267,7 +315,12 @@ const Studio = () => {
       setError("Sign in to save your game.");
       return;
     }
+    // Saving a draft shows the Unity-style asset-import/compile overlay.
+    const showBuild = !publish;
+    const startedAt = Date.now();
+    if (showBuild) setBuild({ active: true, complete: false, mode: "save" });
     setBusy(true);
+    let ok = false;
     try {
       const title = opts?.title ?? config.title;
       const gameplay = buildGameplay(config);
@@ -343,9 +396,19 @@ const Studio = () => {
         setNotice("Saved. Use File ▸ Publish to submit it for review.");
       }
       refreshMyGames();
+      ok = true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save.");
     } finally {
+      if (showBuild) {
+        if (ok) {
+          const remaining = BUILD_MIN_MS - (Date.now() - startedAt);
+          if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+          setBuild((b) => ({ ...b, complete: true }));
+          await new Promise((r) => setTimeout(r, 550));
+        }
+        setBuild((b) => ({ ...b, active: false }));
+      }
       setBusy(false);
     }
   };
@@ -623,6 +686,25 @@ const Studio = () => {
         },
         { separator: true },
         { label: "Operator Search…", shortcut: "F3", onSelect: () => setOperatorOpen(true) },
+        { separator: true },
+        { label: "How to use (tutorial)", onSelect: () => setTourOpen(true) },
+        {
+          label: "Replay opening animation",
+          onSelect: () => {
+            setIntroFirstRun(false);
+            setShowIntro(true);
+          },
+        },
+        { label: "Show tool tips", checked: showTips, onSelect: () => setShowTips(!showTips) },
+        { separator: true },
+        {
+          label: "Reset tips & tutorial",
+          onSelect: () => {
+            clearOnboarded(user?.id);
+            setNotice("Tips & tutorial reset — they'll show again next time you open the studio.");
+          },
+        },
+        { separator: true },
         { label: "Toolbar / Properties / Mode", shortcut: "T · N · Tab", disabled: true },
         { label: "Views: Front/Right/Top/Camera", shortcut: "1 / 3 / 7 / 0", disabled: true },
         { label: "Move ← → / WASD · Space = shoot/jump", disabled: true },
@@ -904,16 +986,17 @@ const Studio = () => {
         </div>
         <div className="ml-1 flex items-stretch gap-0.5 border-l border-[#3d3d3d] py-1 pl-2">
           {WORKSPACES.map((ws) => (
-            <button
-              key={ws}
-              type="button"
-              onClick={() => setWorkspace(ws)}
-              className={`rounded-[3px] px-2 text-[11px] ${
-                workspace === ws ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"
-              }`}
-            >
-              {ws}
-            </button>
+            <Tip key={ws} label={`${ws} workspace`} description={TOOL_TIPS[ws]} enabled={showTips} side="bottom">
+              <button
+                type="button"
+                onClick={() => setWorkspace(ws)}
+                className={`rounded-[3px] px-2 text-[11px] ${
+                  workspace === ws ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"
+                }`}
+              >
+                {ws}
+              </button>
+            </Tip>
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1 px-2">
@@ -923,33 +1006,43 @@ const Studio = () => {
           <span className="hidden rounded-[3px] border border-[#3d3d3d] px-2 py-1 text-[10px] text-[#b0b0b0] xl:inline">
             ViewLayer
           </span>
-          <button type="button" title="Toggle AI Assistant (Shift+A)" onClick={() => setShowAIAssistant((v) => !v)} className={iconBtn(showAIAssistant)}>
-            <Bot className="h-4 w-4" />
-          </button>
-          <button type="button" title="Toggle Properties" onClick={() => setShowPanels((v) => !v)} className={iconBtn(showPanels)}>
-            <PanelRight className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => persist(false)}
-            disabled={busy || !isOwner}
-            className="flex h-7 items-center gap-1 rounded-[3px] border border-[#4a4a4a] px-2 text-[11px] text-[#d0d0d0] hover:bg-[#3a3a3a] disabled:opacity-40"
-          >
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => persist(true)}
-            disabled={busy || !isOwner}
-            className="flex h-7 items-center gap-1 rounded-[3px] bg-[#4772b3] px-2 text-[11px] text-white hover:bg-[#5a85c6] disabled:opacity-40"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            {record?.released_at ? "Update" : "Publish"}
-          </button>
-          <button type="button" title="Exit to NexConsole" onClick={() => navigate("/create")} className={iconBtn()}>
-            <LogOut className="h-4 w-4" />
-          </button>
+          <Tip label="Muse AI assistant" description="Build or edit the game from a prompt." shortcut="Shift+A" enabled={showTips} side="bottom">
+            <button type="button" title="Toggle AI Assistant (Shift+A)" onClick={() => setShowAIAssistant((v) => !v)} className={iconBtn(showAIAssistant)}>
+              <Bot className="h-4 w-4" />
+            </button>
+          </Tip>
+          <Tip label="Properties panel" description="Show or hide the Outliner and Properties side panel." shortcut="N" enabled={showTips} side="bottom">
+            <button type="button" title="Toggle Properties" onClick={() => setShowPanels((v) => !v)} className={iconBtn(showPanels)}>
+              <PanelRight className="h-4 w-4" />
+            </button>
+          </Tip>
+          <Tip label="Save draft" description="Keep a private, unpublished copy of the game." shortcut="Ctrl+S" enabled={showTips} side="bottom">
+            <button
+              type="button"
+              onClick={() => persist(false)}
+              disabled={busy || !isOwner}
+              className="flex h-7 items-center gap-1 rounded-[3px] border border-[#4a4a4a] px-2 text-[11px] text-[#d0d0d0] hover:bg-[#3a3a3a] disabled:opacity-40"
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save
+            </button>
+          </Tip>
+          <Tip label={record?.released_at ? "Update (publish)" : "Publish"} description="Submit the game for review — players can then play it." shortcut="Ctrl+Shift+S" enabled={showTips} side="bottom">
+            <button
+              type="button"
+              onClick={() => persist(true)}
+              disabled={busy || !isOwner}
+              className="flex h-7 items-center gap-1 rounded-[3px] bg-[#4772b3] px-2 text-[11px] text-white hover:bg-[#5a85c6] disabled:opacity-40"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {record?.released_at ? "Update" : "Publish"}
+            </button>
+          </Tip>
+          <Tip label="Exit to NexConsole" description="Leave the studio and return to your dashboard." enabled={showTips} side="bottom">
+            <button type="button" title="Exit to NexConsole" onClick={() => navigate("/create")} className={iconBtn()}>
+              <LogOut className="h-4 w-4" />
+            </button>
+          </Tip>
         </div>
       </div>
 
@@ -981,19 +1074,25 @@ const Studio = () => {
               {SHADING.map((s) => {
                 const Icon = s.icon;
                 return (
-                  <button key={s.id} type="button" title={s.label} onClick={() => setShading(s.id)} className={iconBtn(shading === s.id)}>
-                    <Icon className="h-3.5 w-3.5" />
-                  </button>
+                  <Tip key={s.id} label={s.label} description={s.tip} enabled={showTips} side="bottom">
+                    <button type="button" title={s.label} onClick={() => setShading(s.id)} className={iconBtn(shading === s.id)}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </button>
+                  </Tip>
                 );
               })}
               <div className="mx-1 h-4 w-px bg-[#3d3d3d]" />
               <span className="text-[10px] text-[#8f8f8f]">Viewport</span>
-              <button type="button" onClick={() => setDimension("2d")} className={segCls(dimension === "2d")}>
-                2D
-              </button>
-              <button type="button" onClick={() => setDimension("3d")} className={segCls(dimension === "3d")}>
-                3D
-              </button>
+              <Tip label="2D viewport" description="Flat canvas for 2D games." enabled={showTips} side="bottom">
+                <button type="button" onClick={() => setDimension("2d")} className={segCls(dimension === "2d")}>
+                  2D
+                </button>
+              </Tip>
+              <Tip label="3D viewport" description="Full 3D world with orbit / pan / zoom." enabled={showTips} side="bottom">
+                <button type="button" onClick={() => setDimension("3d")} className={segCls(dimension === "3d")}>
+                  3D
+                </button>
+              </Tip>
             </div>
           </div>
 
