@@ -25,6 +25,9 @@ const Play = () => {
   const [error, setError] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [gameId, setGameId] = useState<string>("");
+  const [liveNonce, setLiveNonce] = useState(0);
+  const [liveNotice, setLiveNotice] = useState<string | null>(null);
+  const loadedVersionRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!gameKey || !canvasRef.current) return;
@@ -32,6 +35,7 @@ const Play = () => {
     let destroyed = false;
     let stopAutosave: (() => void) | null = null;
     let stopConnectivity: (() => void) | null = null;
+    let offGameOver: (() => void) | null = null;
 
     const init = async () => {
       try {
@@ -41,6 +45,8 @@ const Play = () => {
 
         setGameTitle(pkg.title ?? gameKey);
         setLoading(false);
+        setLiveNotice(null);
+        loadedVersionRef.current = pkg.version ?? 0;
 
         // 2. Get game ID for score submission
         const { data: gameRecord } = await supabase
