@@ -21,6 +21,23 @@ import type { ReactNode, RefObject } from "react";
 
 export type Workspace = "Layout" | "Modeling" | "Shading" | "Animation" | "Rendering" | "Scripting";
 
+/** Everything the 3D viewport needs from the editor state. */
+export interface ViewportSceneProps {
+  scene: import("@/lib/scene3d").Scene;
+  selectedId: string | null;
+  selectedVertices: number[];
+  editMode: string;
+  brush: string;
+  brushRadius: number;
+  brushStrength: number;
+  cameraPov: boolean;
+  onSelectObject: (id: string | null) => void;
+  onSelectVertices: (indices: number[]) => void;
+  onTransform: (delta: import("@/lib/scene3d").Vec3, mode: "move" | "rotate" | "scale") => void;
+  onSculpt: (localPoint: import("@/lib/scene3d").Vec3, delta: import("@/lib/scene3d").Vec3) => void;
+  setCameraPov: (on: boolean) => void;
+}
+
 interface LayoutProps {
   workspace: Workspace;
   config: any;
@@ -51,6 +68,8 @@ interface LayoutProps {
   outlinerHeight: number;
   setOutlinerHeight: (n: number) => void;
   showTips: boolean;
+  /** 3D scene state, only used when dimension === "3d". */
+  viewport: ViewportSceneProps;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -84,6 +103,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     outlinerHeight,
     setOutlinerHeight,
     showTips,
+    viewport,
   } = props;
 
   const RenderViewport = null;
