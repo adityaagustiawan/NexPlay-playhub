@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "ship": "bash scripts/ship.sh",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },

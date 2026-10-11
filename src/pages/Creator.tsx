@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { asJson } from "@/lib/supabaseJson";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -156,7 +157,7 @@ const Creator = () => {
           game_key: gameKey,
           title: title.trim(),
           description: description.trim() || null,
-          gameplay,
+          gameplay: asJson(gameplay),
           assets: {},
           version: 1,
           released_at: null,
