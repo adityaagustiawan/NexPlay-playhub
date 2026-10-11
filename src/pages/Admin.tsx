@@ -50,6 +50,13 @@ import {
   moderationStatus,
   type ReportRow,
 } from "@/lib/moderation";
+import {
+  devcoinsToUsd,
+  formatDevcoins,
+  formatUsd,
+  payoutStatusLabel,
+} from "@/lib/devcoins";
+import { fetchPendingPayouts, resolvePayout, type DevcoinPayout } from "@/lib/devcoinsApi";
 
 interface ModProfile {
   user_id: string;
@@ -80,6 +87,7 @@ const Admin = () => {
   const [profiles, setProfiles] = useState<ModProfile[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [payouts, setPayouts] = useState<DevcoinPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -95,6 +103,10 @@ const Admin = () => {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Payout resolution: which request is being worked on, and its note.
+  const [payoutBusy, setPayoutBusy] = useState<string | null>(null);
+  const [payoutNotes, setPayoutNotes] = useState<Record<string, string>>({});
+
   const profileById = useMemo(() => {
     const map = new Map<string, ModProfile>();
     for (const p of profiles) map.set(p.user_id, p);
@@ -104,7 +116,7 @@ const Admin = () => {
   const loadAll = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const [profilesRes, reportsRes, auditRes] = await Promise.all([
+    const [profilesRes, reportsRes, auditRes, payoutsRes] = await Promise.all([
       supabase
         .from("profiles")
         .select(
@@ -117,6 +129,7 @@ const Admin = () => {
         .select("id, admin_id, target_user_id, action, reason, until, created_at")
         .order("created_at", { ascending: false })
         .limit(50),
+      fetchPendingPayouts(),
     ]);
 
     if (profilesRes.error || reportsRes.error) {
@@ -125,6 +138,7 @@ const Admin = () => {
     setProfiles((profilesRes.data as ModProfile[]) ?? []);
     setReports((reportsRes.data as ReportRow[]) ?? []);
     setAudit((auditRes.data as AuditRow[]) ?? []);
+    setPayouts(payoutsRes);
     setLoading(false);
   }, []);
 
@@ -278,6 +292,27 @@ const Admin = () => {
     return { success: true };
   };
 
+  /**
+   * Approve or reject a DevCoin cash-out request. Rejecting refunds the
+   * DevCoins to the creator, approving marks it paid (paid off-platform).
+   */
+  const handlePayout = async (payout: DevcoinPayout, approve: boolean) => {
+    setPayoutBusy(payout.id);
+    try {
+      await resolvePayout(payout.id, approve, payoutNotes[payout.id]);
+      toast.success(
+        approve
+          ? `Payout marked paid — ${formatDevcoins(payout.devcoins)} DevCoins (${formatUsd(payout.amount_cents)})`
+          : `Payout rejected — ${formatDevcoins(payout.devcoins)} DevCoins refunded`
+      );
+      await loadAll();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not resolve payout");
+    } finally {
+      setPayoutBusy(null);
+    }
+  };
+
   const resolveReport = async (report: ReportRow, status: "resolved" | "dismissed") => {
     setBusy(true);
     let viaServer = true;
@@ -363,6 +398,9 @@ const Admin = () => {
             Reported players {pendingCount > 0 ? `(${pendingCount})` : ""}
           </TabsTrigger>
           <TabsTrigger value="players">All players</TabsTrigger>
+          <TabsTrigger value="payouts">
+            Cash-outs {payouts.length > 0 ? `(${payouts.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
 
@@ -554,6 +592,86 @@ const Admin = () => {
                 );
               })}
             </div>
+          )}
+        </TabsContent>
+
+        {/* ---- Cash-out requests ---- */}
+        <TabsContent value="payouts" className="mt-4 space-y-3">
+          {loading ? (
+            <Loading />
+          ) : payouts.length === 0 ? (
+            <Empty
+              icon={<Coins className="h-10 w-10 text-muted-foreground mb-3" />}
+              text="No DevCoin cash-out requests."
+            />
+          ) : (
+            <>
+              <p className="font-body text-xs text-muted-foreground">
+                Rejecting a request refunds the DevCoins to the creator. Approving marks it paid —
+                pay it out manually via the creator's chosen method, then record the transaction
+                here.
+              </p>
+              <div className="bg-card border border-border rounded-xl divide-y divide-border">
+                {payouts.map((payout) => {
+                  const creator = profileById.get(payout.user_id);
+                  const busy = payoutBusy === payout.id;
+                  return (
+                    <div key={payout.id} className="p-4 space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Avatar name={creator?.display_name} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-body text-sm font-semibold text-foreground">
+                            {creator?.display_name || creator?.public_id || "Creator"}
+                            <span className="ml-2 font-body text-xs text-muted-foreground">
+                              {formatDevcoins(payout.devcoins)} DevCoins
+                            </span>
+                          </p>
+                          <p className="font-body text-xs text-foreground">
+                            Pays out{" "}
+                            <span className="font-semibold text-primary">
+                              {formatUsd(payout.amount_cents)}
+                            </span>{" "}
+                            <span className="text-muted-foreground">
+                              (≈ {devcoinsToUsd(payout.devcoins)})
+                            </span>
+                          </p>
+                          <p className="font-body text-[11px] text-muted-foreground">
+                            {new Date(payout.requested_at).toLocaleString()}
+                            {payout.method ? ` · wants ${payout.method}` : ""} ·{" "}
+                            {payoutStatusLabel(payout.status)}
+                          </p>
+                        </div>
+                      </div>
+                      <Textarea
+                        placeholder="Optional note for this cash-out"
+                        value={payoutNotes[payout.id] ?? ""}
+                        rows={2}
+                        onChange={(e) =>
+                          setPayoutNotes((prev) => ({ ...prev, [payout.id]: e.target.value }))
+                        }
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void handlePayout(payout, true)}
+                        >
+                          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Mark paid"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busy}
+                          onClick={() => void handlePayout(payout, false)}
+                        >
+                          Reject & refund
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </TabsContent>
 
