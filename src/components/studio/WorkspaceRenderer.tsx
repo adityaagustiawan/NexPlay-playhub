@@ -12,6 +12,7 @@ import { ImageEditor } from "@/components/studio/ImageEditor";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
 import { GamePreview } from "@/components/GamePreview";
+import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode, RefObject } from "react";
@@ -78,9 +79,28 @@ export function WorkspaceRenderer(props: LayoutProps) {
     return (
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-[#1d1d1d] bg-[#303030] px-2">
-            {headerMenusRender()}
-          </div>
+            headerMenusRender={() => (
+              <>
+                <StudioMenu
+                  label={editMode}
+                  align="start"
+                  triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#d0d0d0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
+                  items={["Object Mode", "Edit Mode", "Sculpt Mode", "Vertex Paint"].map((m) => ({
+                    label: m,
+                    checked: editMode === m,
+                    onSelect: () => setEditMode(m),
+                  }))}
+                />
+                {headerMenus.map((m) => (
+                  <StudioMenu
+                    key={m.label}
+                    label={m.label}
+                    items={m.items}
+                    triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
+                  />
+                ))}
+              </>
+            )}
           <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
             {showToolbar && (
               <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
