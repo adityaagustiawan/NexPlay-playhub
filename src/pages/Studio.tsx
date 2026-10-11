@@ -25,11 +25,13 @@ import {
   type StudioConfig,
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
-import { Viewport3D } from "@/components/studio/Viewport3D";
+import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
 import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
+import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
+import { useBlenderInput } from "@/hooks/useBlenderInput";
 import {
   AlertTriangle,
   Box,
@@ -46,6 +48,7 @@ import {
   MousePointer2,
   PanelRight,
   PenTool,
+  Play,
   Plus,
   RotateCw,
   Ruler,
@@ -120,12 +123,17 @@ const ColorField = ({
   </Field>
 );
 
-const BlenderLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-    <circle cx="12" cy="12" r="11" fill="#ea7600" />
-    <rect x="6" y="5.5" width="2.3" height="13" rx="1.1" fill="#fff" />
-    <circle cx="13" cy="14.3" r="4" fill="none" stroke="#fff" strokeWidth="2.3" />
-  </svg>
+// NexPlay brand mark — a play triangle in the NexConsole blue. Replaces the
+// Blender logo in the top bar while keeping the Blender-style editor chrome.
+const NexPlayLogo = () => (
+  <span className="flex select-none items-center gap-1.5 pl-1">
+    <span className="flex h-5 w-5 items-center justify-center rounded-[4px] bg-[#4772b3]">
+      <Play className="h-3 w-3 text-white" fill="currentColor" />
+    </span>
+    <span className="font-heading text-[13px] font-bold leading-none tracking-wide text-[#e8e8e8]">
+      Nex<span className="text-[#5a85c6]">Play</span>
+    </span>
+  </span>
 );
 
 const Studio = () => {
@@ -135,6 +143,8 @@ const Studio = () => {
   const gameKeyParam = params.get("game");
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<Viewport3DHandle>(null);
+  const viewportBodyRef = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<StudioConfig>(DEFAULT_CONFIG);
   const [record, setRecord] = useState<GameRecord | null>(null);
   const [loading, setLoading] = useState(Boolean(gameKeyParam));
@@ -150,6 +160,8 @@ const Studio = () => {
   const [tool, setTool] = useState("Select Box");
   const [editMode, setEditMode] = useState("Object Mode");
   const [showPanels, setShowPanels] = useState(true);
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [operatorOpen, setOperatorOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   const [openDialog, setOpenDialog] = useState(false);
@@ -346,6 +358,114 @@ const Studio = () => {
 
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
+
+  // Input device detection + navigation intents, ported from blender-web's
+  // web-input-detector (GHOST-inspired). Drives zoom / pan / orbit in the 3D
+  // viewport and reports the detected device (mouse vs trackpad) in the status bar.
+  const input = useBlenderInput(
+    viewportBodyRef,
+    {
+      onZoom: (factor) => {
+        if (config.dimension === "3d") viewportRef.current?.zoom(factor);
+      },
+      onPan: (dx, dy) => {
+        if (config.dimension === "3d") viewportRef.current?.pan(dx, dy);
+      },
+      onOrbit: (dx, dy) => {
+        if (config.dimension === "3d") viewportRef.current?.orbit(dx, dy);
+      },
+      onRotate: (radians) => {
+        if (config.dimension === "3d") viewportRef.current?.orbit(radians * 60, 0);
+      },
+    },
+    true,
+  );
+
+  // Every action in the editor, exposed through Blender's F3 "Operator Search".
+  const operators: StudioOperator[] = [
+    { id: "file.save", label: "File: Save", hint: "Ctrl+S", run: () => void persist(false) },
+    { id: "file.publish", label: "File: Publish / Update", hint: "Ctrl+Shift+S", run: () => void persist(true) },
+    {
+      id: "file.open",
+      label: "File: Open Game…",
+      hint: "Ctrl+O",
+      run: () => {
+        void refreshMyGames();
+        setOpenDialog(true);
+      },
+    },
+    { id: "file.new", label: "File: New Game", hint: "Ctrl+N", run: newGame },
+    { id: "view.frame_all", label: "View: Frame All", hint: "Numpad .", run: () => viewportRef.current?.frameAll() },
+    { id: "view.front", label: "View: Front", hint: "Numpad 1", run: () => viewportRef.current?.setView("front") },
+    { id: "view.right", label: "View: Right", hint: "Numpad 3", run: () => viewportRef.current?.setView("right") },
+    { id: "view.top", label: "View: Top", hint: "Numpad 7", run: () => viewportRef.current?.setView("top") },
+    { id: "view.camera", label: "View: Camera", hint: "Numpad 0", run: () => viewportRef.current?.setView("camera") },
+    { id: "view.toolbar", label: "View: Toggle Toolbar", hint: "T", run: () => setShowToolbar((v) => !v) },
+    { id: "view.properties", label: "View: Toggle Properties", hint: "N", run: () => setShowPanels((v) => !v) },
+    {
+      id: "object.mode",
+      label: "Object: Toggle Edit / Object Mode",
+      hint: "Tab",
+      run: () => setEditMode((m) => (m === "Object Mode" ? "Edit Mode" : "Object Mode")),
+    },
+    { id: "add.2d", label: "Add: 2D Game", run: () => setDimension("2d") },
+    { id: "add.3d", label: "Add: 3D Game", run: () => setDimension("3d") },
+    { id: "window.fullscreen", label: "Window: Fullscreen", run: toggleFullscreen },
+    {
+      id: "edit.reset",
+      label: "Edit: Reset Settings",
+      run: () => setConfig((c) => ({ ...DEFAULT_CONFIG, title: c.title, description: c.description })),
+    },
+  ];
+
+  // Blender-style unmodified keymap: T toolbar, N properties, Tab mode switch,
+  // numpad views, F3 operator search.
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      return (
+        el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
+      );
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "F3") {
+        e.preventDefault();
+        setOperatorOpen((v) => !v);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setEditMode((m) => (m === "Object Mode" ? "Edit Mode" : "Object Mode"));
+        return;
+      }
+      switch (e.key) {
+        case "t":
+          setShowToolbar((v) => !v);
+          break;
+        case "n":
+          setShowPanels((v) => !v);
+          break;
+        case "1":
+          viewportRef.current?.setView("front");
+          break;
+        case "3":
+          viewportRef.current?.setView("right");
+          break;
+        case "7":
+          viewportRef.current?.setView("top");
+          break;
+        case "0":
+          viewportRef.current?.setView("camera");
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -716,7 +836,7 @@ const Studio = () => {
       {/* ---- Top bar ---- */}
       <div className="flex h-8 shrink-0 items-stretch border-b border-black bg-[#1d1d1d]">
         <div className="flex items-center px-2">
-          <BlenderLogo />
+          <NexPlayLogo />
         </div>
         <div className="flex items-stretch gap-0.5 py-1">
           {topMenus.map((m) => (
@@ -816,30 +936,32 @@ const Studio = () => {
           </div>
 
           {/* Viewport body */}
-          <div className="relative min-h-0 flex-1 bg-[#2b2b2b]">
+          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
             {/* Tool column */}
-            <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-              {TOOLS.map((t) => {
-                const Icon = t.icon;
-                return (
-                  <button key={t.label} type="button" title={t.label} onClick={() => setTool(t.label)} className={iconBtn(tool === t.label)}>
-                    <Icon className="h-4 w-4" />
-                  </button>
-                );
-              })}
-            </div>
+            {showToolbar && (
+              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                {TOOLS.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button key={t.label} type="button" title={t.label} onClick={() => setTool(t.label)} className={iconBtn(tool === t.label)}>
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {/* Overlay text */}
-            <div className="pointer-events-none absolute left-11 top-2 z-10 text-[10px] text-[#b0b0b0]">
+            <div className={`pointer-events-none absolute top-2 z-10 text-[10px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
               (1) Scene Collection | {editMode}
             </div>
-            <div className="pointer-events-none absolute bottom-2 left-11 z-10 text-[10px] text-[#8f8f8f]">
+            <div className={`pointer-events-none absolute bottom-2 z-10 text-[10px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
               {dimension === "3d" ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel: zoom" : `${config.mode} view · ${config.dimension.toUpperCase()}`}
             </div>
 
             {/* Content: 2D canvas or 3D world */}
             <div key={`${dimension}-${nonce}`} className="h-full w-full">
               {dimension === "3d" ? (
-                <Viewport3D mode={config.mode} goal={config.goal} theme={config.theme} />
+                <Viewport3D ref={viewportRef} mode={config.mode} goal={config.goal} theme={config.theme} />
               ) : (
                 <GamePreview
                   fill
