@@ -50,6 +50,13 @@ import {
   moderationStatus,
   type ReportRow,
 } from "@/lib/moderation";
+import {
+  devcoinsToUsd,
+  formatDevcoins,
+  formatUsd,
+  payoutStatusLabel,
+} from "@/lib/devcoins";
+import { fetchPendingPayouts, resolvePayout, type DevcoinPayout } from "@/lib/devcoinsApi";
 
 interface ModProfile {
   user_id: string;
@@ -80,6 +87,7 @@ const Admin = () => {
   const [profiles, setProfiles] = useState<ModProfile[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [payouts, setPayouts] = useState<DevcoinPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -94,6 +102,10 @@ const Admin = () => {
   const [durationHours, setDurationHours] = useState<number>(24);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Payout resolution: which request is being worked on, and its note.
+  const [payoutBusy, setPayoutBusy] = useState<string | null>(null);
+  const [payoutNotes, setPayoutNotes] = useState<Record<string, string>>({});
 
   const profileById = useMemo(() => {
     const map = new Map<string, ModProfile>();

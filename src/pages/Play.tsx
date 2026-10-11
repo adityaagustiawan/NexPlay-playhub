@@ -15,6 +15,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Gamepad2, AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ReportButton } from "@/components/ReportDialog";
+import { GameStore } from "@/components/GameStore";
 
 const Play = () => {
   const { gameKey } = useParams<{ gameKey: string }>();
@@ -225,6 +226,8 @@ const Play = () => {
             <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {liveNotice}
           </div>
         )}
+
+        {gameId && <GameStore gameId={gameId} creatorId={creatorId} />}
 
         <p className="font-body text-xs text-muted-foreground text-center">
           Progress autosaves every 5 seconds. Score submits on game over.

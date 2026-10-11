@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
@@ -160,6 +161,18 @@ export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse 
             >
               <ShieldCheck className="h-5 w-5 shrink-0" />
               <span className={`font-body text-sm font-medium ${label}`}>Admin</span>
+            </NavLink>
+          )}
+          {isPro && (
+            <NavLink
+              to="/devcoins"
+              title="DevCoins"
+              className={`flex items-center px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors ${iconRow}`}
+              activeClassName="bg-secondary text-foreground"
+              onClick={onClose}
+            >
+              <Wallet className="h-5 w-5 shrink-0" />
+              <span className={`font-body text-sm font-medium ${label}`}>DevCoins</span>
             </NavLink>
           )}
         </div>
