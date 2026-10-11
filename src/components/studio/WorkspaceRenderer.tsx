@@ -12,6 +12,7 @@ import { ImageEditor } from "@/components/studio/ImageEditor";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
 import { GamePreview } from "@/components/GamePreview";
+import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode, RefObject } from "react";
@@ -42,6 +43,7 @@ interface LayoutProps {
   tools: { icon: any; label: string }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
+  setEditMode?: (m: string) => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -69,6 +71,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tools,
     viewportRef,
     viewportBodyRef,
+    setEditMode,
   } = props;
 
   const RenderViewport = null;
