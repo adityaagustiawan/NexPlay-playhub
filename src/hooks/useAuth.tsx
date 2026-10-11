@@ -8,6 +8,7 @@ export interface AuthProfile {
   avatar_url: string | null;
   bio: string | null;
   coins: number;
+  devcoins: number;
   role: string | null;
   creator_tier: string | null;
   is_banned: boolean | null;
