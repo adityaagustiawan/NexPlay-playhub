@@ -66,15 +66,13 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tool,
     setTool,
     shading,
-    headerMenus,
     headerMenusRender,
     tools,
     viewportRef,
     viewportBodyRef,
-    renderViewport,
   } = props;
 
-  const RenderViewport = renderViewport;
+  const RenderViewport = null;
   // Reusable viewport shell pieces? Keep simple: render based on workspace.
 
   if (workspace === "Layout") {
