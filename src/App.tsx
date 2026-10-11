@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireAdmin } from "@/components/RequireAdmin";
+import { FreeTierOnly } from "@/components/FreeTierOnly";
 import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
@@ -48,7 +49,7 @@ const App = () => (
             <Route path="/studio" element={<Studio />} />
             <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
-            <Route path="/create" element={<Create />} />
+            <Route path="/create" element={<FreeTierOnly><Create /></FreeTierOnly>} />
             <Route path="/creator" element={<RequireAuth><Creator /></RequireAuth>} />
             <Route path="/play/:gameKey" element={<Play />} />
             <Route path="/friends" element={<Friends />} />

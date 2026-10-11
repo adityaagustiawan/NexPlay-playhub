@@ -16,6 +16,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 import { useAuth } from "@/hooks/useAuth";
+import { creationNav } from "@/lib/nav";
 
 const navItems = [
   { title: "Home", url: "/library", icon: Home },
@@ -34,7 +35,11 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse }: AppSidebarProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPro } = useAuth();
+  // Pro creators/admins use the Creator studio; free/trial accounts get the
+  // quick Create page. See src/lib/nav.ts.
+  const nav = creationNav(isPro, Boolean(user));
+  const navItems = ALL_NAV_ITEMS.filter((item) => nav.showCreateItem || item.url !== "/create");
   // When the rail is collapsed, hovering temporarily expands it as an overlay
   // ("peek") so labels are readable without pinning the sidebar open.
   const [peeking, setPeeking] = useState(false);
