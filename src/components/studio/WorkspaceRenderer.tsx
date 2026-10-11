@@ -42,7 +42,6 @@ interface LayoutProps {
   tools: { icon: any; label: string }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
-  renderViewport: () => ReactNode;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -66,15 +65,13 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tool,
     setTool,
     shading,
-    headerMenus,
     headerMenusRender,
     tools,
     viewportRef,
     viewportBodyRef,
-    renderViewport,
   } = props;
 
-  const RenderViewport = renderViewport;
+  const RenderViewport = null;
   // Reusable viewport shell pieces? Keep simple: render based on workspace.
 
   if (workspace === "Layout") {
