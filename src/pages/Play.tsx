@@ -15,6 +15,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Gamepad2, AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ReportButton } from "@/components/ReportDialog";
+import { GameStore } from "@/components/GameStore";
 
 const Play = () => {
   const { gameKey } = useParams<{ gameKey: string }>();
