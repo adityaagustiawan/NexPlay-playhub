@@ -248,6 +248,9 @@ const Studio = () => {
     }
   };
 
+  // Only the owner may save/publish; everyone else gets a read-only editor.
+  const isOwner = !record || (!!user && user.id === record.user_id);
+
   // ---- Inspector groups ----
   const inspector = () => {
     switch (selected) {
