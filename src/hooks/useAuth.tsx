@@ -8,6 +8,7 @@ export interface AuthProfile {
   avatar_url: string | null;
   bio: string | null;
   coins: number;
+  devcoins: number;
   role: string | null;
   creator_tier: string | null;
   is_banned: boolean | null;
@@ -48,7 +49,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const PROFILE_COLUMNS =
-  "display_name, avatar_url, bio, coins, role, creator_tier, is_banned, banned_reason, suspended_until, suspended_reason";
+  "display_name, avatar_url, bio, coins, devcoins, role, creator_tier, is_banned, banned_reason, suspended_until, suspended_reason";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar_url: null,
         bio: null,
         coins: 0,
+        devcoins: 0,
         role: null,
         creator_tier: null,
         is_banned: false,
