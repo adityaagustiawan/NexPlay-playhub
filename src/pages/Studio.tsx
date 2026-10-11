@@ -35,7 +35,9 @@ import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
 import { AIAssistant } from "@/components/studio/AIAssistant";
 import { MusePromptBar } from "@/components/studio/MusePromptBar";
+import { ResizeGrip } from "@/components/studio/ResizeGrip";
 import { useMuse } from "@/hooks/useMuse";
+import { useStoredNumber } from "@/hooks/useStoredNumber";
 import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
@@ -172,6 +174,11 @@ const Studio = () => {
   const [operatorOpen, setOperatorOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [museActivity, setMuseActivity] = useState<string | null>(null);
+
+  // Resizable panel sizes (persisted between sessions).
+  const [museWidth, setMuseWidth] = useStoredNumber("nexstudio_muse_w", 340);
+  const [panelWidth, setPanelWidth] = useStoredNumber("nexstudio_panel_w", 320);
+  const [outlinerHeight, setOutlinerHeight] = useStoredNumber("nexstudio_outliner_h", 200);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -1015,13 +1022,30 @@ const Studio = () => {
             tools={TOOLS}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
+            panelWidth={panelWidth}
+            setPanelWidth={setPanelWidth}
+            outlinerHeight={outlinerHeight}
+            setOutlinerHeight={setOutlinerHeight}
           />
           {showAIAssistant && <MusePromptBar muse={muse} />}
         </div>
         {showAIAssistant && (
-          <div className="hidden w-[340px] shrink-0 flex-col border-l border-black lg:flex">
-            <AIAssistant muse={muse} />
-          </div>
+          <>
+            <ResizeGrip
+              axis="x"
+              invert
+              size={museWidth}
+              min={240}
+              max={720}
+              onResize={setMuseWidth}
+              onReset={() => setMuseWidth(340)}
+              title="Drag to resize Muse · double-click to reset"
+              className="hidden lg:flex"
+            />
+            <div className="hidden shrink-0 flex-col border-l border-black lg:flex" style={{ width: museWidth }}>
+              <AIAssistant muse={muse} />
+            </div>
+          </>
         )}
       </div>
 

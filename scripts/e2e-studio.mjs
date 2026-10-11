@@ -41,6 +41,22 @@ async function run(width, height, label) {
   r.promptBarVisible = await page.getByText(/Try:/).first().isVisible().catch(() => false);
   r.panelVisible = await page.getByText(/Muse · AI/).first().isVisible().catch(() => false);
 
+  // Drag the Muse 3-dot grip and confirm the panel actually resizes.
+  if (r.panelVisible) {
+    const grip = page.locator('[role="separator"][title*="Muse"]').first();
+    const before = await grip.boundingBox().catch(() => null);
+    if (before) {
+      const cx = before.x + before.width / 2;
+      const cy = before.y + before.height / 2;
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      await page.mouse.move(cx - 90, cy, { steps: 12 });
+      await page.mouse.up();
+      const after = await grip.boundingBox().catch(() => null);
+      r.museResizedBy = after ? Math.round(before.x - after.x) : 0;
+    }
+  }
+
   // Drive Muse from the viewport prompt bar.
   const input = page.getByPlaceholder(/Describe a whole game/).first();
   await input.fill("a hard 3D space shooter called Nova");
@@ -62,6 +78,7 @@ async function run(width, height, label) {
     r.titleApplied &&
     r.statusLooks3DShooter &&
     !r.mentionsDescription &&
+    (!r.panelVisible || (r.museResizedBy ?? 0) >= 40) &&
     errors.length === 0;
 
   await page.close();
