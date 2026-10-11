@@ -15,39 +15,126 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          banned_reason: string | null
           bio: string | null
           coins: number
           created_at: string
           display_name: string | null
           id: string
-          updated_at: string
-          user_id: string
+          is_banned: boolean
+          public_id: string | null
           role: string | null
           creator_tier: string | null
+          suspended_reason: string | null
+          suspended_until: string | null
+          updated_at: string
+          user_id: string
+          vip_status: string | null
         }
         Insert: {
           avatar_url?: string | null
+          banned_reason?: string | null
           bio?: string | null
           coins?: number
           created_at?: string
           display_name?: string | null
           id?: string
-          updated_at?: string
-          user_id: string
+          is_banned?: boolean
+          public_id?: string | null
           role?: string | null
           creator_tier?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
+          updated_at?: string
+          user_id: string
+          vip_status?: string | null
         }
         Update: {
           avatar_url?: string | null
+          banned_reason?: string | null
           bio?: string | null
           coins?: number
           created_at?: string
           display_name?: string | null
           id?: string
-          updated_at?: string
-          user_id?: string
+          is_banned?: boolean
+          public_id?: string | null
           role?: string | null
           creator_tier?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
+          updated_at?: string
+          user_id?: string
+          vip_status?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          action: string | null
+          created_at: string
+          id: string
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string
+          id?: string
+          reason: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string
+          id?: string
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      moderation_actions: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          target_user_id: string
+          until: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_user_id: string
+          until?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_user_id?: string
+          until?: string | null
         }
         Relationships: []
       }
