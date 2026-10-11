@@ -983,28 +983,7 @@ const Studio = () => {
             setTool={setTool}
             shading={shading}
             headerMenus={headerMenus}
-            headerMenusRender={() => (
-              <>
-                <StudioMenu
-                  label={editMode}
-                  align="start"
-                  triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#d0d0d0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
-                  items={["Object Mode", "Edit Mode", "Sculpt Mode", "Vertex Paint"].map((m) => ({
-                    label: m,
-                    checked: editMode === m,
-                    onSelect: () => setEditMode(m),
-                  }))}
-                />
-                {headerMenus.map((m) => (
-                  <StudioMenu
-                    key={m.label}
-                    label={m.label}
-                    items={m.items}
-                    triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
-                  />
-                ))}
-              </>
-            )}
+            headerMenusRender={() => null}
             tools={TOOLS}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
