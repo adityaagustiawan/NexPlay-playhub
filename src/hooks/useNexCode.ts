@@ -23,6 +23,7 @@ interface UseNexCode {
   running: boolean;
   blocked: string | null;
   error: string | null;
+  generationId: string | null;
   clear: () => void;
   pushLine: (level: NexCodeLevel, text: string) => void;
   run: (prompt: string, token: string | null | undefined) => Promise<GeneratedGame | null>;
@@ -33,6 +34,7 @@ export function useNexCode(): UseNexCode {
   const [running, setRunning] = useState(false);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generationId, setGenerationId] = useState<string | null>(null);
   const idRef = useRef(0);
 
   const push = useCallback((level: NexCodeLevel, text: string) => {
