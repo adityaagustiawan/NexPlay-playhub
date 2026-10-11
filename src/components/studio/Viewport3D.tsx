@@ -1,8 +1,9 @@
 // Viewport3D.tsx — a small, dependency-free 3D viewport for Nexstudio.
 // Draws the game's world (player / collectibles / hazards) on a Blender-style
-// grid floor with orbit (drag), pan (right-drag / Shift-drag) and zoom (wheel).
-// Used whenever a game's dimension is "3d" so the editor matches what was made.
-import { useEffect, useRef } from "react";
+// grid floor. Navigation: drag to orbit, right-drag / Shift-drag to pan, and
+// zoom/pan intents fed in from the ported blender-web input hook. Camera moves
+// can also be driven imperatively (numpad views, Frame All).
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 interface Vec3 {
   x: number;
@@ -19,14 +20,37 @@ export interface Viewport3DTheme {
   text: string;
 }
 
+export type ViewName = "front" | "back" | "left" | "right" | "top" | "bottom" | "camera";
+
+export interface Viewport3DHandle {
+  setView: (view: ViewName) => void;
+  frameAll: () => void;
+  zoom: (factor: number) => void;
+  orbit: (dx: number, dy: number) => void;
+  pan: (dx: number, dy: number) => void;
+  reset: () => void;
+}
+
 interface Props {
   mode: string;
   goal: number;
   theme: Viewport3DTheme;
 }
 
+interface Cam {
+  yaw: number;
+  pitch: number;
+  dist: number;
+  tx: number;
+  ty: number;
+  tz: number;
+}
+
+const HOME: Cam = { yaw: -0.7, pitch: 0.42, dist: 17, tx: 0, ty: 0.5, tz: 0 };
 const LIGHT: Vec3 = { x: -0.4, y: 0.88, z: 0.42 };
 const HALF = 13;
+const PITCH_MIN = -1.5;
+const PITCH_MAX = 1.5;
 
 function parseHex(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -42,29 +66,33 @@ function shade(hex: string, factor: number): string {
   return `rgb(${c(r)},${c(g)},${c(b)})`;
 }
 
-export function Viewport3D({ mode, goal, theme }: Props) {
+export const Viewport3D = forwardRef<Viewport3DHandle, Props>(function Viewport3D(
+  { mode, goal, theme },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const camRef = useRef<Cam>({ ...HOME });
+  const focalRef = useRef(900);
+  const drawRef = useRef<() => void>(() => {});
+  const sizeRef = useRef({ w: 1, h: 1 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const cam = { yaw: -0.7, pitch: 0.42, dist: 17, tx: 0, ty: 0.5, tz: 0 };
-    let w = 1;
-    let h = 1;
-    let focal = 900;
+    const cam = camRef.current;
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      w = Math.max(1, rect.width);
-      h = Math.max(1, rect.height);
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
+      sizeRef.current = { w, h };
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      focal = Math.min(w, h) * 1.15;
+      focalRef.current = Math.min(w, h) * 1.15;
       draw();
     };
 
@@ -81,10 +109,11 @@ export function Viewport3D({ mode, goal, theme }: Props) {
     };
 
     const project = (p: Vec3) => {
+      const { w, h } = sizeRef.current;
       const r = rotate({ x: p.x - cam.tx, y: p.y - cam.ty, z: p.z - cam.tz });
       const zc = r.z + cam.dist;
       if (zc < 0.2) return { x: 0, y: 0, z: -1, s: 0 };
-      return { x: w / 2 + (r.x * focal) / zc, y: h / 2 - (r.y * focal) / zc, z: zc, s: focal / zc };
+      return { x: w / 2 + (r.x * focalRef.current) / zc, y: h / 2 - (r.y * focalRef.current) / zc, z: zc, s: focalRef.current / zc };
     };
 
     const line = (a: Vec3, b: Vec3, color: string, width = 1) => {
@@ -101,15 +130,12 @@ export function Viewport3D({ mode, goal, theme }: Props) {
 
     const drawGrid = () => {
       for (let i = -HALF; i <= HALF; i++) {
-        const major = i === 0;
-        const fade = i % 5 === 0 ? 0.5 : 0.22;
-        const col = major ? `rgba(150,150,150,0.35)` : `rgba(140,140,140,${fade * 0.5})`;
-        if (i !== 0) {
-          line({ x: i, y: 0, z: -HALF }, { x: i, y: 0, z: HALF }, col);
-          line({ x: -HALF, y: 0, z: i }, { x: HALF, y: 0, z: i }, col);
-        }
+        if (i === 0) continue;
+        const fade = i % 5 === 0 ? 0.25 : 0.11;
+        const col = `rgba(140,140,140,${fade})`;
+        line({ x: i, y: 0, z: -HALF }, { x: i, y: 0, z: HALF }, col);
+        line({ x: -HALF, y: 0, z: i }, { x: HALF, y: 0, z: i }, col);
       }
-      // Coloured floor axes (Blender: X red, Z blue)
       line({ x: -HALF, y: 0, z: 0 }, { x: HALF, y: 0, z: 0 }, "rgba(192,75,75,0.85)", 1.5);
       line({ x: 0, y: 0, z: -HALF }, { x: 0, y: 0, z: HALF }, "rgba(75,106,192,0.85)", 1.5);
       line({ x: 0, y: 0, z: 0 }, { x: 0, y: 4, z: 0 }, "rgba(90,170,90,0.85)", 1.5);
@@ -178,16 +204,13 @@ export function Viewport3D({ mode, goal, theme }: Props) {
     const buildScene = () => {
       const boxes: { c: Vec3; size: number; color: string }[] = [];
       const spheres: { c: Vec3; r: number; color: string }[] = [];
-      // Player
       boxes.push({ c: { x: 0, y: 0.7, z: 0 }, size: 1.3, color: theme.player });
-      // Collectibles ring
       const n = Math.max(3, Math.min(12, goal));
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
         const rad = 3.6 + (i % 2) * 1.4;
         spheres.push({ c: { x: Math.cos(a) * rad, y: 0.6, z: Math.sin(a) * rad }, r: 0.42, color: theme.good });
       }
-      // Hazards
       const hn = mode === "runner" ? 5 : 4;
       for (let i = 0; i < hn; i++) {
         const a = (i / hn) * Math.PI * 2 + 0.5;
@@ -201,32 +224,8 @@ export function Viewport3D({ mode, goal, theme }: Props) {
       return { boxes, spheres };
     };
 
-    const draw = () => {
-      // Background gradient (Blender-ish viewport)
-      const bg = ctx.createLinearGradient(0, 0, 0, h);
-      bg.addColorStop(0, "#2b2b2b");
-      bg.addColorStop(1, "#1a1a1a");
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
-
-      drawGrid();
-      const { boxes, spheres } = buildScene();
-
-      // Painter's algorithm across the whole scene
-      const items = [
-        ...spheres.map((s) => ({ kind: "s" as const, ...s, depth: project(s.c).z })),
-        ...boxes.map((b) => ({ kind: "b" as const, ...b, depth: project(b.c).z })),
-      ].sort((a, b) => b.depth - a.depth);
-
-      for (const it of items) {
-        if (it.kind === "b") drawBox(it.c, it.size, it.color);
-        else drawSphere(it.c, it.r, it.color);
-      }
-
-      drawGizmo();
-    };
-
     const drawGizmo = () => {
+      const { w } = sizeRef.current;
       const ox = w - 34;
       const oy = 34;
       const len = 22;
@@ -253,12 +252,34 @@ export function Viewport3D({ mode, goal, theme }: Props) {
       ctx.fill();
     };
 
-    // --- Input ---
+    function draw() {
+      const { w, h } = sizeRef.current;
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, "#2b2b2b");
+      bg.addColorStop(1, "#1a1a1a");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      drawGrid();
+      const { boxes, spheres } = buildScene();
+      const items = [
+        ...spheres.map((s) => ({ kind: "s" as const, ...s, depth: project(s.c).z })),
+        ...boxes.map((b) => ({ kind: "b" as const, ...b, depth: project(b.c).z })),
+      ].sort((a, b) => b.depth - a.depth);
+
+      for (const it of items) {
+        if (it.kind === "b") drawBox(it.c, it.size, it.color);
+        else drawSphere(it.c, it.r, it.color);
+      }
+      drawGizmo();
+    }
+    drawRef.current = draw;
+
+    // --- Pointer drag: orbit / pan ---
     let dragging = false;
     let panning = false;
     let lastX = 0;
     let lastY = 0;
-
     const onDown = (e: PointerEvent) => {
       dragging = true;
       panning = e.button === 2 || e.shiftKey;
@@ -272,32 +293,17 @@ export function Viewport3D({ mode, goal, theme }: Props) {
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
-      if (panning) {
-        const k = cam.dist / focal;
-        cam.tx -= dx * k * Math.cos(cam.yaw);
-        cam.tz += dx * k * Math.sin(cam.yaw);
-        cam.ty += dy * k;
-      } else {
-        cam.yaw += dx * 0.009;
-        cam.pitch = Math.max(0.05, Math.min(1.5, cam.pitch - dy * 0.009));
-      }
-      draw();
+      applyOrbit(dx, dy, panning);
     };
     const onUp = (e: PointerEvent) => {
       dragging = false;
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
-    };
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      cam.dist = Math.max(5, Math.min(60, cam.dist * (1 + e.deltaY * 0.0012)));
-      draw();
     };
     const onContext = (e: Event) => e.preventDefault();
 
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerup", onUp);
-    canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("contextmenu", onContext);
 
     const ro = new ResizeObserver(resize);
@@ -309,10 +315,65 @@ export function Viewport3D({ mode, goal, theme }: Props) {
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
-      canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("contextmenu", onContext);
     };
   }, [mode, goal, theme]);
 
+  function applyOrbit(dx: number, dy: number, pan: boolean) {
+    const cam = camRef.current;
+    if (pan) {
+      const k = cam.dist / focalRef.current;
+      cam.tx -= dx * k * Math.cos(cam.yaw);
+      cam.tz += dx * k * Math.sin(cam.yaw);
+      cam.ty += dy * k;
+    } else {
+      cam.yaw += dx * 0.009;
+      cam.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, cam.pitch - dy * 0.009));
+    }
+    drawRef.current();
+  }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setView(view: ViewName) {
+        const cam = camRef.current;
+        const r = Math.PI / 2;
+        switch (view) {
+          case "front": cam.yaw = 0; cam.pitch = 0; break;
+          case "back": cam.yaw = Math.PI; cam.pitch = 0; break;
+          case "right": cam.yaw = -r; cam.pitch = 0; break;
+          case "left": cam.yaw = r; cam.pitch = 0; break;
+          case "top": cam.yaw = 0; cam.pitch = 1.49; break;
+          case "bottom": cam.yaw = 0; cam.pitch = -1.49; break;
+          default: cam.yaw = HOME.yaw; cam.pitch = HOME.pitch; break;
+        }
+        drawRef.current();
+      },
+      frameAll() {
+        const cam = camRef.current;
+        cam.tx = HOME.tx; cam.ty = HOME.ty; cam.tz = HOME.tz; cam.dist = HOME.dist;
+        drawRef.current();
+      },
+      zoom(factor: number) {
+        const cam = camRef.current;
+        cam.dist = Math.max(3, Math.min(80, cam.dist / factor));
+        drawRef.current();
+      },
+      orbit(dx: number, dy: number) {
+        applyOrbit(dx, dy, false);
+      },
+      pan(dx: number, dy: number) {
+        applyOrbit(dx, dy, true);
+      },
+      reset() {
+        camRef.current = { ...HOME };
+        focalRef.current = Math.min(sizeRef.current.w, sizeRef.current.h) * 1.15;
+        drawRef.current();
+      },
+    }),
+    [],
+  );
+
   return <canvas ref={canvasRef} className="block h-full w-full cursor-grab touch-none active:cursor-grabbing" />;
-}
+});
