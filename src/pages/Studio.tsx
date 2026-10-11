@@ -33,6 +33,7 @@ import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/stud
 import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
 import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
+import { AIAssistant } from "@/components/studio/AIAssistant";
 import {
   AlertTriangle,
   Box,
@@ -161,9 +162,7 @@ const Studio = () => {
   const [tool, setTool] = useState("Select Box");
   const [editMode, setEditMode] = useState("Object Mode");
   const [showPanels, setShowPanels] = useState(true);
-  const [showToolbar, setShowToolbar] = useState(true);
-  const [operatorOpen, setOperatorOpen] = useState(false);
-  const [nonce, setNonce] = useState(0);
+  const [showAIAssistant, setShowAIAssistant] = useState(true);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -463,6 +462,9 @@ const Studio = () => {
         case "Home":
           viewportRef.current?.frameAll();
           break;
+        case "A":
+          setShowAIAssistant((v) => !v);
+          break;
         default:
           break;
       }
@@ -563,8 +565,8 @@ const Studio = () => {
     {
       label: "Window",
       items: [
-        { label: "Toggle Toolbar", onSelect: () => setShowToolbar((v) => !v), checked: showToolbar },
-        { label: "Toggle Properties", onSelect: () => setShowPanels((v) => !v), checked: showPanels },
+        { label: "AI Assistant", shortcut: "Shift+A", onSelect: () => setShowAIAssistant((v) => !v), checked: showAIAssistant },
+        { separator: true },
         { label: "Fullscreen", onSelect: toggleFullscreen },
         { separator: true },
         { label: "Reload viewport", onSelect: () => setNonce((n) => n + 1) },
