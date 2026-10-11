@@ -57,11 +57,11 @@ function slugify(title: string): string {
 }
 
 const Create = () => {
-  const { user, session, profile } = useAuth();
+  // isPro already counts admins as Pro (they get every feature).
+  const { user, session, isPro, isBlocked } = useAuth();
   const navigate = useNavigate();
   const nexcode = useNexCode();
 
-  const isPro = profile?.creator_tier === "pro";
   const [prompt, setPrompt] = useState("");
   const [myGames, setMyGames] = useState<Game[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
@@ -103,6 +103,11 @@ const Create = () => {
     if (!prompt.trim()) return;
     setNotice(null);
     setError(null);
+
+    if (isBlocked) {
+      setError("Your account is suspended or banned, so you can't create games right now.");
+      return;
+    }
 
     if (atLimit) {
       setError(
@@ -328,7 +333,7 @@ const Create = () => {
               <div className="flex items-center gap-3">
                 <Button
                   onClick={handleGenerate}
-                  disabled={!prompt.trim() || nexcode.running || atLimit}
+                  disabled={!prompt.trim() || nexcode.running || atLimit || isBlocked}
                 >
                   {nexcode.running ? (
                     <>
