@@ -27,6 +27,8 @@ import {
   Send,
   ArrowRight,
   Star,
+  Wrench,
+  Pencil,
 } from "lucide-react";
 
 const FREE_TRIAL_LIMIT = 5;
