@@ -32,6 +32,14 @@ import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPan
 import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
 import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
 import { useBlenderInput } from "@/hooks/useBlenderInput";
+import { Timeline } from "@/components/studio/Timeline";
+import { DopeSheet } from "@/components/studio/DopeSheet";
+import { GraphEditor } from "@/components/studio/GraphEditor";
+import { NodeEditor } from "@/components/studio/NodeEditor";
+import { ImageEditor } from "@/components/studio/ImageEditor";
+import { ConsolePanel } from "@/components/studio/ConsolePanel";
+import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
+import { InfoPanel } from "@/components/studio/InfoPanel";
 import {
   AlertTriangle,
   Box,
