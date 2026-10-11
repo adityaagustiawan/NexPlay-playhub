@@ -26,6 +26,35 @@ import {
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
 import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
+import {
+  activeCamera,
+  addObject,
+  applyVertexMove,
+  applyVertexScale,
+  applyVertexDelete,
+  applyVertexDuplicate,
+  createCamera,
+  createDemoScene,
+  createLight,
+  createMeshObject,
+  deleteVertices,
+  deserializeScene,
+  duplicateSelection,
+  findObject,
+  moveVertices,
+  patchObject,
+  removeObject,
+  scaleSelection,
+  sculpt,
+  serializeScene,
+  setActiveCamera,
+  uniqueName,
+  v3,
+  type LightKind,
+  type PrimitiveKind,
+  type Scene,
+  type Vec3,
+} from "@/lib/scene3d";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
@@ -178,6 +207,16 @@ const Studio = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OutlinerKey>("game");
+
+  // ---- 3D scene (the Blender-like editor) ----
+  const [scene, setScene] = useState<Scene>(() => createDemoScene());
+  const [objectId, setObjectId] = useState<string | null>(null);
+  const [selectedVertices, setSelectedVertices] = useState<number[]>([]);
+  const [cameraPov, setCameraPov] = useState(false);
+  const [brush, setBrush] = useState<string>("draw");
+  const [brushRadius, setBrushRadius] = useState(1.6);
+  const [brushStrength, setBrushStrength] = useState(0.4);
+  const transformMode = tool === "Rotate" ? "rotate" : tool === "Scale" ? "scale" : "move";
 
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
