@@ -28,6 +28,7 @@ export function AIAssistant({ config, onApplyCode }: Props) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("nexstudio_ai_key") || "");
   const [apiBase, setApiBase] = useState(() => localStorage.getItem("nexstudio_ai_base") || "https://api.openai.com/v1");
   const [model, setModel] = useState(() => localStorage.getItem("nexstudio_ai_model") || "gpt-3.5-turbo");
+  const [mode, setMode] = useState<"chat" | "generate" | "edit">("generate");
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
