@@ -98,12 +98,19 @@ function detectTheme(p: string): keyof typeof THEMES | null {
   return null;
 }
 
-function detectTitle(prompt: string, mode: Mode, dim: Dimension, themeKey: keyof typeof THEMES | null): string {
+function detectTitle(
+  prompt: string,
+  mode: Mode,
+  dim: Dimension,
+  themeKey: keyof typeof THEMES | null,
+  subject: string | null,
+): string {
   const explicit = prompt.match(/(?:called|named|titled?|title\s*[:=])\s*["']?([^"'\n,.]{2,40})["']?/i);
   if (explicit) return titleCase(explicit[1].trim());
   const quoted = prompt.match(/["']([^"']{2,40})["']/);
   if (quoted) return titleCase(quoted[1].trim());
   const noun = mode === "shooter" ? "Shooter" : mode === "runner" ? "Runner" : "Catcher";
+  if (subject) return `${titleCase(subject)} ${noun}`;
   const prefix =
     themeKey && themeKey !== "mono" ? titleCase(themeKey) : dim === "3d" ? "Voxel" : "Neon";
   return `${prefix} ${noun}`;
@@ -127,6 +134,33 @@ function detectSpeed(p: string): number | null {
   if (/faster|fast|quick|speed up|hyper|sonic/.test(p)) return 6;
   if (/slow|chill|calm|gentle/.test(p)) return 2;
   return null;
+}
+
+/** Pull object nouns out of phrases like "collect gems" / "avoid spikes". */
+function detectElementNames(prompt: string): { good?: string; bad?: string } {
+  const p = prompt.toLowerCase();
+  const good = p.match(
+    /(?:collect(?:ing)?|grab(?:bing)?|gather(?:ing)?|pick up|catch(?:ing)?|save|rescue)\s+(?:the\s+|some\s+|a\s+|an\s+)?([a-z]{3,})/,
+  );
+  const bad = p.match(
+    /(?:avoid(?:ing)?|dodge|dodging|escape|escaping|shoot(?:ing)?|blast(?:ing)?|destroy(?:ing)?|defeat(?:ing)?|kill(?:ing)?|fight(?:ing)?)\s+(?:the\s+|some\s+|a\s+|an\s+)?([a-z]{3,})/,
+  );
+  return {
+    good: good?.[1] ? titleCase(good[1]) : undefined,
+    bad: bad?.[1] ? titleCase(bad[1]) : undefined,
+  };
+}
+
+/** "a game about a cat" / "you are a robot" → "cat" / "robot". */
+function detectSubject(prompt: string): string | null {
+  const m = prompt.match(/\b(?:about|playing as|you(?:'re| are)|where you(?:'re| are))\s+(?:a|an|the)?\s*([a-z]{3,})/i);
+  return m ? m[1] : null;
+}
+
+/** Only touch the description when the user explicitly asks for one. */
+function detectDescription(prompt: string): string | null {
+  const m = prompt.match(/(?:description|desc|subtitle)\s*(?:to|as|:|=)?\s*["']([^"']{2,200})["']/i);
+  return m ? m[1].trim() : null;
 }
 
 /** Plan a whole game from a free-text prompt, with no network access. */
