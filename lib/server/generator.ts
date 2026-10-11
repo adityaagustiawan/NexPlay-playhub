@@ -232,12 +232,22 @@ const SYSTEM_PROMPT = [
   'Schema: {"title":string,"description":string,"gameplay":{"mode":"catch"|"shooter"|"runner","genre":string,"difficulty":"easy"|"medium"|"hard","levels":number,"goal":number,"speed":number,"spawnMs":number,"theme":{"bg":"#hex","player":"#hex","good":"#hex","bad":"#hex","accent":"#hex","text":"#hex"},"names":{"player":string,"good":string,"bad":string}}}',
 ].join(" ");
 
-/** Try the optional LLM; return null on any problem. */
-async function generateWithLLM(prompt: string): Promise<GeneratedGame | null> {
+/**
+ * Try the optional LLM; return null on any problem.
+ *
+ * `references` is a compact block of previously player-approved games (see
+ * lib/server/learning.ts). When present it is appended to the system prompt so
+ * the model imitates what players rated best — this is how NexCode "learns".
+ */
+async function generateWithLLM(prompt: string, references = ""): Promise<GeneratedGame | null> {
   const key = process.env.NEXCODE_LLM_API_KEY;
   if (!key) return null;
   const url = process.env.NEXCODE_LLM_URL || "https://api.openai.com/v1/chat/completions";
   const model = process.env.NEXCODE_LLM_MODEL || "gpt-4o-mini";
+
+  const system = references
+    ? `${SYSTEM_PROMPT} These are games real players rated highest. Use them as style references for tone, naming and tuning — never copy a title verbatim:\n${references}`
+    : SYSTEM_PROMPT;
 
   try {
     const controller = new AbortController();
@@ -251,7 +261,7 @@ async function generateWithLLM(prompt: string): Promise<GeneratedGame | null> {
         temperature: 0.8,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: system },
           { role: "user", content: `Game idea: ${prompt}` },
         ],
       }),
