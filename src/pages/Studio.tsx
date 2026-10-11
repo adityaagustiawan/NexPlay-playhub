@@ -25,11 +25,13 @@ import {
   type StudioConfig,
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
-import { Viewport3D } from "@/components/studio/Viewport3D";
+import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
 import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
+import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
+import { useBlenderInput } from "@/hooks/useBlenderInput";
 import {
   AlertTriangle,
   Box,
@@ -46,6 +48,7 @@ import {
   MousePointer2,
   PanelRight,
   PenTool,
+  Play,
   Plus,
   RotateCw,
   Ruler,
@@ -120,12 +123,17 @@ const ColorField = ({
   </Field>
 );
 
-const BlenderLogo = () => (
-  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-    <circle cx="12" cy="12" r="11" fill="#ea7600" />
-    <rect x="6" y="5.5" width="2.3" height="13" rx="1.1" fill="#fff" />
-    <circle cx="13" cy="14.3" r="4" fill="none" stroke="#fff" strokeWidth="2.3" />
-  </svg>
+// NexPlay brand mark — a play triangle in the NexConsole blue. Replaces the
+// Blender logo in the top bar while keeping the Blender-style editor chrome.
+const NexPlayLogo = () => (
+  <span className="flex select-none items-center gap-1.5 pl-1">
+    <span className="flex h-5 w-5 items-center justify-center rounded-[4px] bg-[#4772b3]">
+      <Play className="h-3 w-3 text-white" fill="currentColor" />
+    </span>
+    <span className="font-heading text-[13px] font-bold leading-none tracking-wide text-[#e8e8e8]">
+      Nex<span className="text-[#5a85c6]">Play</span>
+    </span>
+  </span>
 );
 
 const Studio = () => {
@@ -135,6 +143,8 @@ const Studio = () => {
   const gameKeyParam = params.get("game");
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<Viewport3DHandle>(null);
+  const viewportBodyRef = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<StudioConfig>(DEFAULT_CONFIG);
   const [record, setRecord] = useState<GameRecord | null>(null);
   const [loading, setLoading] = useState(Boolean(gameKeyParam));
@@ -150,6 +160,8 @@ const Studio = () => {
   const [tool, setTool] = useState("Select Box");
   const [editMode, setEditMode] = useState("Object Mode");
   const [showPanels, setShowPanels] = useState(true);
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [operatorOpen, setOperatorOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   const [openDialog, setOpenDialog] = useState(false);
