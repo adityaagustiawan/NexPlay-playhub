@@ -25,6 +25,9 @@ const Play = () => {
   const [error, setError] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [gameId, setGameId] = useState<string>("");
+  const [liveNonce, setLiveNonce] = useState(0);
+  const [liveNotice, setLiveNotice] = useState<string | null>(null);
+  const loadedVersionRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!gameKey || !canvasRef.current) return;
