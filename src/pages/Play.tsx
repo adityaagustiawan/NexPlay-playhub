@@ -12,7 +12,7 @@ import {
 } from "@/lib/saveGame";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
-import { Gamepad2, AlertTriangle } from "lucide-react";
+import { Gamepad2, AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const Play = () => {
@@ -25,6 +25,9 @@ const Play = () => {
   const [error, setError] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [gameId, setGameId] = useState<string>("");
+  const [liveNonce, setLiveNonce] = useState(0);
+  const [liveNotice, setLiveNotice] = useState<string | null>(null);
+  const loadedVersionRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!gameKey || !canvasRef.current) return;
@@ -32,6 +35,7 @@ const Play = () => {
     let destroyed = false;
     let stopAutosave: (() => void) | null = null;
     let stopConnectivity: (() => void) | null = null;
+    let offGameOver: (() => void) | null = null;
 
     const init = async () => {
       try {
@@ -41,6 +45,8 @@ const Play = () => {
 
         setGameTitle(pkg.title ?? gameKey);
         setLoading(false);
+        setLiveNotice(null);
+        loadedVersionRef.current = pkg.version ?? 0;
 
         // 2. Get game ID for score submission
         const { data: gameRecord } = await supabase
@@ -85,16 +91,12 @@ const Play = () => {
         });
 
         // 7. Listen for game over -> submit score
-        const offGameOver = eventBus.on(EngineEvents.GameOver, () => {
+        offGameOver = eventBus.on(EngineEvents.GameOver, () => {
           const state = gameRef.current?.getState();
           if (state && user && gameRecord) {
             submitScore(gameRecord.id, user.id, state.score);
           }
         });
-
-        return () => {
-          offGameOver();
-        };
       } catch (err) {
         if (!destroyed) {
           setError(err instanceof Error ? err.message : "Failed to load game");
@@ -107,11 +109,36 @@ const Play = () => {
 
     return () => {
       destroyed = true;
+      offGameOver?.();
       stopAutosave?.();
       stopConnectivity?.();
       gameRef.current?.destroy();
     };
-  }, [gameKey, user]);
+  }, [gameKey, user, liveNonce]);
+
+  // Live updates: a Nexstudio publish/update bumps games.version. When that
+  // happens for the game currently open, remount it with the new package.
+  useEffect(() => {
+    if (!gameKey) return;
+    const channel = supabase
+      .channel(`game-updates-${gameKey}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "games", filter: `game_key=eq.${gameKey}` },
+        (payload) => {
+          const incoming = payload.new as { version?: number };
+          if (typeof incoming.version !== "number") return;
+          if (loadedVersionRef.current >= 0 && incoming.version > loadedVersionRef.current) {
+            setLiveNotice(`Creator updated this game to v${incoming.version} — refreshing…`);
+            setLiveNonce((n) => n + 1);
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [gameKey]);
 
   if (loading) {
     return (
@@ -161,6 +188,12 @@ const Play = () => {
             style={{ imageRendering: "pixelated" }}
           />
         </div>
+
+        {liveNotice && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-body text-primary">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {liveNotice}
+          </div>
+        )}
 
         <p className="font-body text-xs text-muted-foreground text-center">
           Progress autosaves every 5 seconds. Score submits on game over.
