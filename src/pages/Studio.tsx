@@ -36,8 +36,13 @@ import { WorkspaceRenderer, type Workspace } from "@/components/studio/Workspace
 import { AIAssistant } from "@/components/studio/AIAssistant";
 import { MusePromptBar } from "@/components/studio/MusePromptBar";
 import { ResizeGrip } from "@/components/studio/ResizeGrip";
+import { StudioIntro } from "@/components/studio/StudioIntro";
+import { StudioTour } from "@/components/studio/StudioTour";
+import { BuildProgress } from "@/components/studio/BuildProgress";
+import { Tip } from "@/components/studio/Tip";
 import { useMuse } from "@/hooks/useMuse";
-import { useStoredNumber } from "@/hooks/useStoredNumber";
+import { useStoredNumber, useStoredFlag } from "@/hooks/useStoredNumber";
+import { clearOnboarded, hasOnboarded, markOnboarded } from "@/lib/onboarding";
 import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
@@ -70,23 +75,35 @@ import {
 
 const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "Scripting"];
 
+// Minimum time the "asset import" build overlay stays visible when saving.
+const BUILD_MIN_MS = 1600;
+
+const TOOL_TIPS: Record<string, string> = {
+  Layout: "Model, script and preview — the default Blender-style layout.",
+  Modeling: "Edit the mesh and object transforms.",
+  Shading: "Materials, textures and the image editor.",
+  Animation: "Dope sheet, graph editor and timeline.",
+  Rendering: "Node editor, output and render settings.",
+  Scripting: "Write and run game logic in the console.",
+};
+
 const TOOLS = [
-  { icon: MousePointer2, label: "Select Box" },
-  { icon: Circle, label: "Cursor" },
-  { icon: Move, label: "Move" },
-  { icon: RotateCw, label: "Rotate" },
-  { icon: Maximize2, label: "Scale" },
-  { icon: Ruler, label: "Measure" },
-  { icon: PenTool, label: "Annotate" },
-  { icon: Crosshair, label: "Add" },
-  { icon: Plus, label: "Add Object" },
+  { icon: MousePointer2, label: "Select Box", shortcut: "B", tip: "Box-select objects by dragging in the viewport." },
+  { icon: Circle, label: "Cursor", shortcut: "Shift+Space", tip: "Place the 3D cursor — new objects spawn from it." },
+  { icon: Move, label: "Move", shortcut: "G", tip: "Grab the selected object and move it." },
+  { icon: RotateCw, label: "Rotate", shortcut: "R", tip: "Rotate the selected object around its pivot." },
+  { icon: Maximize2, label: "Scale", shortcut: "S", tip: "Resize the selected object." },
+  { icon: Ruler, label: "Measure", shortcut: "M", tip: "Measure distances between points in the viewport." },
+  { icon: PenTool, label: "Annotate", shortcut: "D", tip: "Draw freehand notes on the viewport." },
+  { icon: Crosshair, label: "Add", shortcut: "Shift+A", tip: "Add a new object at the cursor." },
+  { icon: Plus, label: "Add Object", tip: "Add a game object — player, pickups or hazards." },
 ];
 
 const SHADING = [
-  { id: "wire", icon: Circle, label: "Wireframe" },
-  { id: "solid", icon: Square, label: "Solid" },
-  { id: "mat", icon: Sun, label: "Material Preview" },
-  { id: "rend", icon: Camera, label: "Rendered" },
+  { id: "wire", icon: Circle, label: "Wireframe", tip: "Show edges only." },
+  { id: "solid", icon: Square, label: "Solid", tip: "Default shaded viewport." },
+  { id: "mat", icon: Sun, label: "Material Preview", tip: "Preview materials with a studio light." },
+  { id: "rend", icon: Camera, label: "Rendered", tip: "Full render preview." },
 ];
 
 const PROP_TABS: PropTab[] = [
@@ -146,7 +163,7 @@ const NexPlayLogo = () => (
 );
 
 const Studio = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const gameKeyParam = params.get("game");
@@ -179,6 +196,18 @@ const Studio = () => {
   const [museWidth, setMuseWidth] = useStoredNumber("nexstudio_muse_w", 340);
   const [panelWidth, setPanelWidth] = useStoredNumber("nexstudio_panel_w", 320);
   const [outlinerHeight, setOutlinerHeight] = useStoredNumber("nexstudio_outliner_h", 200);
+
+  // Preferences & first-run onboarding.
+  const [showTips, setShowTips] = useStoredFlag("nexstudio_tips", true);
+  const [showIntro, setShowIntro] = useState(false);
+  const [introFirstRun, setIntroFirstRun] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [onboardReady, setOnboardReady] = useState(false);
+  const [build, setBuild] = useState<{ active: boolean; complete: boolean; mode: "save" | "publish" }>({
+    active: false,
+    complete: false,
+    mode: "save",
+  });
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -244,6 +273,25 @@ const Studio = () => {
     refreshMyGames();
   }, [refreshMyGames]);
 
+  // First-run onboarding: the opening animation shows on every open, and the
+  // full "how to use" tour only the first time this account opens the studio.
+  useEffect(() => {
+    if (authLoading || onboardReady) return;
+    setOnboardReady(true);
+    setIntroFirstRun(!hasOnboarded(user?.id));
+    setShowIntro(true);
+  }, [authLoading, onboardReady, user?.id]);
+
+  const finishIntro = useCallback(() => {
+    setShowIntro(false);
+    if (introFirstRun) setTourOpen(true);
+  }, [introFirstRun]);
+
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
+    markOnboarded(user?.id);
+  }, [user?.id]);
+
   const pkg: GamePackage = useMemo(
     () => ({
       gameplay: buildGameplay(config),
@@ -267,7 +315,12 @@ const Studio = () => {
       setError("Sign in to save your game.");
       return;
     }
+    // Saving a draft shows the Unity-style asset-import/compile overlay.
+    const showBuild = !publish;
+    const startedAt = Date.now();
+    if (showBuild) setBuild({ active: true, complete: false, mode: "save" });
     setBusy(true);
+    let ok = false;
     try {
       const title = opts?.title ?? config.title;
       const gameplay = buildGameplay(config);
@@ -343,9 +396,19 @@ const Studio = () => {
         setNotice("Saved. Use File ▸ Publish to submit it for review.");
       }
       refreshMyGames();
+      ok = true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save.");
     } finally {
+      if (showBuild) {
+        if (ok) {
+          const remaining = BUILD_MIN_MS - (Date.now() - startedAt);
+          if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+          setBuild((b) => ({ ...b, complete: true }));
+          await new Promise((r) => setTimeout(r, 550));
+        }
+        setBuild((b) => ({ ...b, active: false }));
+      }
       setBusy(false);
     }
   };
