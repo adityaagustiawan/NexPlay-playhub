@@ -137,9 +137,21 @@ export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
         // Give the overlay a beat so the studio visibly shows the AI working.
         await new Promise((r) => setTimeout(r, 420));
         const plan = planGame(text, config);
-        onApplyConfig?.(plan.config, plan.actions);
-        setActions(plan.actions);
-        setMessages((m) => [...m, { role: "assistant", content: actionSummary(plan.rationale, plan.actions) }]);
+        // "Object" mode only places/renames things; "Build"/"Edit" retune the game.
+        const next: StudioConfig =
+          mode === "object"
+            ? {
+                ...config,
+                dimension: plan.config.dimension,
+                theme: plan.config.theme,
+                names: plan.config.names,
+                description: plan.config.description,
+              }
+            : plan.config;
+        const acts = diffConfig(config, next);
+        onApplyConfig?.(next, acts);
+        setActions(acts);
+        setMessages((m) => [...m, { role: "assistant", content: actionSummary(plan.rationale, acts) }]);
         onActivity?.(null);
         return;
       }
