@@ -1,4 +1,4 @@
-// AIAssistant.tsx â€” BlenderGPT-inspired AI assistant panel for NexPlay Studio.
+// AIAssistant.tsx â BlenderGPT-inspired AI assistant panel for NexPlay Studio.
 // Provides a chat interface that can generate code, suggest changes, or answer
 // questions about the game. Works with OpenAI-compatible APIs (including free
 // endpoints).
@@ -28,6 +28,7 @@ export function AIAssistant({ config, onApplyCode }: Props) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("nexstudio_ai_key") || "");
   const [apiBase, setApiBase] = useState(() => localStorage.getItem("nexstudio_ai_base") || "https://api.openai.com/v1");
   const [model, setModel] = useState(() => localStorage.getItem("nexstudio_ai_model") || "gpt-3.5-turbo");
+  const [mode, setMode] = useState<"chat" | "generate" | "edit">("generate");
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -42,16 +43,19 @@ export function AIAssistant({ config, onApplyCode }: Props) {
   }, [apiKey, apiBase, model]);
 
   const systemPrompt = `You are an AI assistant for NexPlay Studio, a Blender-style 2D/3D game editor.
-You can:
-- Generate and explain code (JavaScript/TypeScript) for modifying games
-- Suggest improvements to gameplay, visuals, and mechanics
-- Answer questions about the editor
+Your job is to help the user create, modify, and describe game objects and scenes by generating Python-like or executable instructions, but also respond clearly in natural language.
+${mode === "generate" ? "- Focus on generating objects/scenes based on description. Be concrete and actionable." : mode === "edit" ? "- Focus on editing/modifying existing elements." : "- General chat about the editor and game design."}
 
 Current game config: ${JSON.stringify(config, null, 2)}
 
-Respond in clear markdown. When generating code, wrap it in \`\`\`javascript\`\`\` or \`\`\`typescript\`\`\`.`;
+Respond in clear markdown. When you generate code to modify the scene, wrap it in \`\`\`javascript\`\`\` or \`\`\`typescript\`\`\` so it can be applied.`;
 
-  const sendMessage = async () => {
+  const welcomeMsg =
+    mode === "generate"
+      ? "Describe what you want to create (e.g., 'create a spinning cube', 'make a 2D platformer level')."
+      : mode === "edit"
+      ? "Tell me what to change (e.g., 'make player faster', 'add more collectibles')."
+      : "Ask anything about NexPlay Studio or your game.";
     if (!input.trim() || loading) return;
     const userMsg = { role: "user" as const, content: input.trim() };
     setMessages((prev) => [...prev, userMsg]);
@@ -105,7 +109,12 @@ Respond in clear markdown. When generating code, wrap it in \`\`\`javascript\`\`
     setMessages([
       {
         role: "assistant",
-        content: "Chat cleared. What can I help you with?",
+        content:
+          mode === "generate"
+            ? "Describe what you want to create..."
+            : mode === "edit"
+            ? "Tell me what to change..."
+            : "Ask anything about NexPlay Studio.",
       },
     ]);
   };
@@ -131,6 +140,20 @@ Respond in clear markdown. When generating code, wrap it in \`\`\`javascript\`\`
           <span className="font-heading uppercase tracking-wide text-[#b8b8b8]">AI Assistant</span>
         </div>
         <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 rounded-[3px] border border-[#4a4a4a] bg-[#1d1d1d] p-0.5">
+            {["generate", "edit", "chat"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m as any)}
+                className={`rounded-[2px] px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+                  mode === m ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
