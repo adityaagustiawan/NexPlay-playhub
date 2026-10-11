@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Sparkles, ArrowRight, Loader2, Wrench, Check } from "lucide-react";
 import { MUSE_MODES, type MuseController } from "@/hooks/useMuse";
+import { Tip } from "@/components/studio/Tip";
 
 interface Props {
   muse: MuseController;
@@ -58,18 +59,20 @@ export function MusePromptBar({ muse }: Props) {
       <div className="flex items-center gap-2 px-2 py-1.5">
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#7bd88f]" />
         <span className="hidden shrink-0 text-[10px] uppercase tracking-wide text-[#b8b8b8] sm:inline">Muse</span>
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as typeof mode)}
-          title="Muse mode"
-          className="h-6 shrink-0 rounded-[3px] border border-[#4a4a4a] bg-[#1d1d1d] px-1 text-[10px] text-[#e0e0e0] outline-none focus:border-[#4772b3]"
-        >
-          {MUSE_MODES.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <Tip label="Muse mode" description="Build a whole game, edit one object, or just chat." side="top">
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as typeof mode)}
+            title="Muse mode"
+            className="h-6 shrink-0 rounded-[3px] border border-[#4a4a4a] bg-[#1d1d1d] px-1 text-[10px] text-[#e0e0e0] outline-none focus:border-[#4772b3]"
+          >
+            {MUSE_MODES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </Tip>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -83,16 +86,18 @@ export function MusePromptBar({ muse }: Props) {
           disabled={loading}
           className="h-7 min-w-0 flex-1 rounded-[3px] border border-[#4a4a4a] bg-[#1d1d1d] px-2 text-[11px] text-[#e6e6e6] outline-none placeholder:text-[#7a7a7a] focus:border-[#4772b3] disabled:opacity-50"
         />
-        <button
-          type="button"
-          onClick={() => submit(input)}
-          disabled={loading || !input.trim()}
-          title="Send to Muse"
-          className="flex h-7 shrink-0 items-center gap-1 rounded-[3px] bg-[#4772b3] px-2.5 text-[11px] text-white hover:bg-[#5a85c6] disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">Build</span>
-        </button>
+        <Tip label="Build with Muse" description="Send the prompt — Muse creates the objects and settings." shortcut="Enter" side="top">
+          <button
+            type="button"
+            onClick={() => submit(input)}
+            disabled={loading || !input.trim()}
+            title="Send to Muse"
+            className="flex h-7 shrink-0 items-center gap-1 rounded-[3px] bg-[#4772b3] px-2.5 text-[11px] text-white hover:bg-[#5a85c6] disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">Build</span>
+          </button>
+        </Tip>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
 import { ResizeGrip } from "@/components/studio/ResizeGrip";
+import { Tip } from "@/components/studio/Tip";
 import { Timeline } from "@/components/studio/Timeline";
 import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
@@ -41,7 +42,7 @@ interface LayoutProps {
   shading: string;
   headerMenus: { label: string; items: any[] }[];
   headerMenusRender: () => ReactNode;
-  tools: { icon: any; label: string }[];
+  tools: { icon: any; label: string; tip?: string; shortcut?: string }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
   setEditMode?: (m: string) => void;
@@ -49,6 +50,7 @@ interface LayoutProps {
   setPanelWidth: (n: number) => void;
   outlinerHeight: number;
   setOutlinerHeight: (n: number) => void;
+  showTips: boolean;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -81,6 +83,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     setPanelWidth,
     outlinerHeight,
     setOutlinerHeight,
+    showTips,
   } = props;
 
   const RenderViewport = null;
@@ -99,9 +102,11 @@ export function WorkspaceRenderer(props: LayoutProps) {
                 {tools.map((t) => {
                   const Icon = t.icon;
                   return (
-                    <button key={t.label} type="button" title={t.label} onClick={() => setTool(t.label)} className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}>
-                      <Icon className="h-4 w-4" />
-                    </button>
+                    <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
+                      <button type="button" title={t.label} onClick={() => setTool(t.label)} className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}>
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    </Tip>
                   );
                 })}
               </div>
