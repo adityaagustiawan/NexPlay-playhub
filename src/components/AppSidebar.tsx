@@ -16,8 +16,9 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 import { useAuth } from "@/hooks/useAuth";
+import { creationNav } from "@/lib/nav";
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { title: "Home", url: "/library", icon: Home },
   { title: "Discover", url: "/explore", icon: Compass },
   { title: "Create", url: "/create", icon: Sparkles },
@@ -34,7 +35,11 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse }: AppSidebarProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isPro } = useAuth();
+  // Pro creators/admins use the Creator studio; free/trial accounts get the
+  // quick Create page. See src/lib/nav.ts.
+  const nav = creationNav(isPro, Boolean(user));
+  const navItems = ALL_NAV_ITEMS.filter((item) => nav.showCreateItem || item.url !== "/create");
   // When the rail is collapsed, hovering temporarily expands it as an overlay
   // ("peek") so labels are readable without pinning the sidebar open.
   const [peeking, setPeeking] = useState(false);
@@ -103,17 +108,17 @@ export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse 
           </button>
         </div>
 
-        {/* Create button */}
+        {/* Primary action: Create (free/trial) or Creator (Pro/admins) */}
         <div className={`mb-6 ${railCollapsed ? "px-4 md:px-2" : "px-4"}`}>
           <NavLink
-            to="/create"
-            title="Create"
+            to={nav.primaryTo}
+            title={nav.primaryLabel}
             className="flex items-center gap-2 bg-primary text-primary-foreground font-heading text-sm font-semibold px-3 py-3 rounded-lg w-full justify-center hover:opacity-90 transition-opacity"
             activeClassName="opacity-90"
             onClick={onClose}
           >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span className={label}>Create</span>
+            {isPro ? <Wrench className="h-4 w-4 shrink-0" /> : <Plus className="h-4 w-4 shrink-0" />}
+            <span className={label}>{nav.primaryLabel}</span>
           </NavLink>
         </div>
 
