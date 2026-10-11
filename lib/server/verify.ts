@@ -50,7 +50,7 @@ function checkConfig(game: GeneratedGame): VerifyCheck {
   if (!Number.isFinite(gp.goal) || gp.goal < 1) issues.push("goal must be >= 1");
   if (!Number.isFinite(gp.levels) || gp.levels < 1) issues.push("levels must be >= 1");
   for (const key of ["bg", "player", "good", "bad", "accent", "text"] as const) {
-    const val = (gp.theme as Record<string, unknown>)?.[key];
+    const val = gp.theme?.[key];
     if (typeof val !== "string" || !HEX.test(val)) issues.push(`bad theme.${key}`);
   }
   if (!gp.names || typeof gp.names.player !== "string") issues.push("missing names");
