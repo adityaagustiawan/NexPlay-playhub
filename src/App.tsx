@@ -23,11 +23,12 @@ import Studio from "./pages/Studio";
 const queryClient = new QueryClient();
 
 /**
- * Landing (nexconsole) or the editor (nexstudio) depending on the hostname.
- * The same build serves both domains; nexstudio.vercel.app lands in the studio.
+ * Landing (nexconsole) or the editor (Nexstudio) depending on the hostname.
+ * The same build serves both sites; any nexstudio* host lands in the editor
+ * (e.g. getnexstudio.vercel.app, nexstudio-mu.vercel.app).
  */
 const RootRoute = () => {
-  if (typeof window !== "undefined" && window.location.hostname.startsWith("nexstudio.")) {
+  if (typeof window !== "undefined" && window.location.hostname.includes("nexstudio")) {
     return <Navigate to="/studio" replace />;
   }
   return <Landing />;
