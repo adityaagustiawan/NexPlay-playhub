@@ -12,12 +12,13 @@ import {
 } from "@/lib/saveGame";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
-import { Gamepad2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Gamepad2, AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ReportButton } from "@/components/ReportDialog";
 
 const Play = () => {
   const { gameKey } = useParams<{ gameKey: string }>();
-  const { user } = useAuth();
+  const { user, isBlocked } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<GameInstance | null>(null);
 
@@ -25,6 +26,8 @@ const Play = () => {
   const [error, setError] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [gameId, setGameId] = useState<string>("");
+  const [creatorId, setCreatorId] = useState<string>("");
+  const [creatorName, setCreatorName] = useState<string>("");
   const [liveNonce, setLiveNonce] = useState(0);
   const [liveNotice, setLiveNotice] = useState<string | null>(null);
   const loadedVersionRef = useRef<number>(-1);

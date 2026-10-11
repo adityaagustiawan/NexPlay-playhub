@@ -11,6 +11,7 @@ import {
   Boxes,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
@@ -33,7 +34,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse }: AppSidebarProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   // When the rail is collapsed, hovering temporarily expands it as an overlay
   // ("peek") so labels are readable without pinning the sidebar open.
   const [peeking, setPeeking] = useState(false);
@@ -142,6 +143,18 @@ export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse 
             >
               <Wrench className="h-5 w-5 shrink-0" />
               <span className={`font-body text-sm font-medium ${label}`}>Creator</span>
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              title="Admin"
+              className={`flex items-center px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors ${iconRow}`}
+              activeClassName="bg-secondary text-foreground"
+              onClick={onClose}
+            >
+              <ShieldCheck className="h-5 w-5 shrink-0" />
+              <span className={`font-body text-sm font-medium ${label}`}>Admin</span>
             </NavLink>
           )}
         </div>
