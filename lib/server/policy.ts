@@ -64,8 +64,10 @@ const RULES: { category: PolicyCategory; re: RegExp; warning: string }[] = [
 
 // Broad "is this a game idea at all?" vocabulary. Used only to nudge clearly
 // off-topic prompts — it is intentionally generous to avoid false positives.
+// Stems are used (with a trailing `[a-z]*`) so inflections like "collecting",
+// "catcher" and "dodging" are recognised instead of being rejected.
 const GAME_WORDS =
-  /\b(game|games|gameplay|play|player|level|levels|score|arcade|puzzle|platformer|platform|runner|racing|race|shooter|shoot|rpg|adventure|quest|dungeon|maze|collect|catch|avoid|dodge|jump|enemy|enemies|boss|power[\s-]?up|coins?|spaceship|alien|zombie|car|kart|ball|block|tetris|snake|frog|bird|cat|dog|dragon|ninja|pirate|knight|wizard|robot|fish|fruit|jewel|gem|treasure|pong|breakout|survival|battle|fight|run|fly|swim|climb|explore|match|tile|card|board|multiplayer)\b/i;
+  /\b(game|gameplay|play|level|score|arcade|puzzle|platform|shoot|run|rac|catch|collect|avoid|dodg|jump|enemy|boss|power[\s-]?up|coin|spaceship|space|alien|zombie|car|kart|ball|block|tetris|snake|frog|bird|cat|dog|dragon|ninja|pirate|knight|wizard|robot|fish|fruit|jewel|gem|treasure|pong|breakout|survival|battle|fight|fly|swim|climb|explor|match|tile|card|board|multiplayer|star|meteor|asteroid|monster|hero|magic|ghost|tower|snow|ice|fire|adventure|rpg|quest|dungeon|maze|energy|core|laser|blast|portal|pixel|warp)[a-z]*\b/i;
 
 /**
  * Classify a prompt. Returns { allowed: true } when NexCode may build it.
