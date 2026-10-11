@@ -248,6 +248,9 @@ const Studio = () => {
     }
   };
 
+  // Only the owner may save/publish; everyone else gets a read-only editor.
+  const isOwner = !record || (!!user && user.id === record.user_id);
+
   // ---- Inspector groups ----
   const inspector = () => {
     switch (selected) {
@@ -463,11 +466,11 @@ const Studio = () => {
               <ExternalLink className="h-4 w-4 mr-1" /> Play
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => persist(false)} disabled={busy}>
+          <Button size="sm" variant="outline" onClick={() => persist(false)} disabled={busy || !isOwner}>
             {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
             Save
           </Button>
-          <Button size="sm" onClick={() => persist(true)} disabled={busy}>
+          <Button size="sm" onClick={() => persist(true)} disabled={busy || !isOwner}>
             <Upload className="h-4 w-4 mr-1" />
             {record?.released_at ? "Update" : "Publish"}
           </Button>
