@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planGame, parseModelConfig, mergeConfig, museSystemPrompt } from "@/lib/musePlan";
+import { planGame, parseModelConfig, mergeConfig, diffConfig, museSystemPrompt } from "@/lib/musePlan";
 import { DEFAULT_CONFIG } from "@/lib/studioConfig";
 import { PROVIDERS, defaultAIConfig, findProvider, allModels } from "@/lib/aiProviders";
 
@@ -88,6 +88,22 @@ describe("mergeConfig", () => {
 
   it("returns base for a missing patch", () => {
     expect(mergeConfig(DEFAULT_CONFIG, undefined)).toEqual(DEFAULT_CONFIG);
+  });
+});
+
+describe("diffConfig", () => {
+  it("reports changed fields as tool actions", () => {
+    const next = { ...DEFAULT_CONFIG, mode: "runner" as const, speed: 5.1, title: "Zoom" };
+    const acts = diffConfig(DEFAULT_CONFIG, next);
+    const tools = acts.map((a) => a.tool);
+    expect(tools).toContain("set_mode");
+    expect(tools).toContain("set_speed");
+    expect(tools).toContain("set_title");
+    expect(tools).not.toContain("set_goal");
+  });
+
+  it("returns nothing for an unchanged config", () => {
+    expect(diffConfig(DEFAULT_CONFIG, { ...DEFAULT_CONFIG })).toEqual([]);
   });
 });
 
