@@ -53,11 +53,9 @@ interface Game {
 }
 
 const Creator = () => {
-  const { user, profile } = useAuth();
+  // isPro already counts admins as Pro (they get every feature).
+  const { user, isPro } = useAuth();
   const navigate = useNavigate();
-
-  const creatorTier = profile?.creator_tier ?? "free";
-  const isPro = creatorTier === "pro";
 
   // Form state
   const [title, setTitle] = useState("");
