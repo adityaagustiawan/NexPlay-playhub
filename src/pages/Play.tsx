@@ -12,12 +12,13 @@ import {
 } from "@/lib/saveGame";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
-import { Gamepad2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Gamepad2, AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ReportButton } from "@/components/ReportDialog";
 
 const Play = () => {
   const { gameKey } = useParams<{ gameKey: string }>();
-  const { user } = useAuth();
+  const { user, isBlocked } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<GameInstance | null>(null);
 
@@ -25,12 +26,19 @@ const Play = () => {
   const [error, setError] = useState<string | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [gameId, setGameId] = useState<string>("");
+  const [creatorId, setCreatorId] = useState<string>("");
+  const [creatorName, setCreatorName] = useState<string>("");
   const [liveNonce, setLiveNonce] = useState(0);
   const [liveNotice, setLiveNotice] = useState<string | null>(null);
   const loadedVersionRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!gameKey || !canvasRef.current) return;
+    // Suspended or banned accounts cannot play until the block is lifted.
+    if (isBlocked) {
+      setLoading(false);
+      return;
+    }
 
     let destroyed = false;
     let stopAutosave: (() => void) | null = null;
@@ -47,15 +55,24 @@ const Play = () => {
         setLoading(false);
         loadedVersionRef.current = pkg.version ?? 0;
 
-        // 2. Get game ID for score submission
+        // 2. Get game ID for score submission (and its creator, for reporting).
         const { data: gameRecord } = await supabase
           .from("games")
-          .select("id")
+          .select("id, user_id")
           .eq("game_key", gameKey)
           .maybeSingle();
 
         if (gameRecord) {
           setGameId(gameRecord.id);
+          setCreatorId(gameRecord.user_id ?? "");
+          if (gameRecord.user_id) {
+            const { data: creator } = await supabase
+              .from("profiles")
+              .select("display_name")
+              .eq("user_id", gameRecord.user_id)
+              .maybeSingle();
+            if (creator?.display_name) setCreatorName(creator.display_name);
+          }
         }
 
         // 3. Resume from saved state
@@ -113,7 +130,7 @@ const Play = () => {
       stopConnectivity?.();
       gameRef.current?.destroy();
     };
-  }, [gameKey, user, liveNonce]);
+  }, [gameKey, user, liveNonce, isBlocked]);
 
   // Live updates: a Nexstudio publish/update bumps games.version. When that
   // happens for the game currently open, remount it with the new package.
@@ -158,16 +175,35 @@ const Play = () => {
     );
   }
 
+  if (isBlocked) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center py-20">
+          <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+          <h2 className="font-heading text-lg font-bold text-foreground mb-2">Playback unavailable</h2>
+          <p className="font-body text-sm text-muted-foreground">
+            Your account is suspended or banned, so games can't be played right now.
+          </p>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="font-heading text-xl font-bold text-foreground">
             {gameTitle}
           </h1>
-          <span className="font-body text-xs text-muted-foreground">
-            {gameKey}
-          </span>
+          <div className="flex items-center gap-3">
+            {creatorId && (
+              <ReportButton targetUserId={creatorId} targetName={creatorName || "creator"} label="Report creator" />
+            )}
+            <span className="font-body text-xs text-muted-foreground">
+              {gameKey}
+            </span>
+          </div>
         </div>
 
         <div className="relative rounded-2xl overflow-hidden border border-border bg-card">
