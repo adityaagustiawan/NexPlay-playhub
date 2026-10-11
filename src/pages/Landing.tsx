@@ -1,5 +1,4 @@
 import { NavLink } from "@/components/NavLink";
-import { BetaBadge } from "@/components/BetaBadge";
 import { PromptDemo } from "@/components/PromptDemo";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -59,7 +58,6 @@ const Landing = () => {
           <span className="font-heading text-lg font-bold">
             <span className="text-primary">NEX</span>CONSOLE
           </span>
-          <BetaBadge className="ml-1" />
         </NavLink>
 
         <div className="ml-auto flex items-center gap-3">
