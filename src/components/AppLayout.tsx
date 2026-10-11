@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopBar } from "@/components/TopBar";
+import { AccountStatusBanner } from "@/components/AccountStatusBanner";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,7 +40,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         onToggleCollapse={() => setCollapsed((c) => !c)}
       />
       <TopBar onMenuToggle={() => setSidebarOpen(true)} collapsed={collapsed} />
-      <main className={mainClass}>{children}</main>
+      <main className={mainClass}>
+        <div className="-mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-4 md:mb-6 empty:hidden">
+          <AccountStatusBanner />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }
