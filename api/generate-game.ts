@@ -15,6 +15,7 @@ import { checkPrompt } from "../lib/server/policy.js";
 import { generateGame, generateLocal } from "../lib/server/generator.js";
 import { verifyGame } from "../lib/server/verify.js";
 import { getAdminClient } from "../lib/server/admin.js";
+import { getTopExamples, toFewShot, recordGeneration } from "../lib/server/learning.js";
 
 export const config = { runtime: "nodejs" } as const;
 
