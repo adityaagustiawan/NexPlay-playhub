@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RequireAdmin } from "@/components/RequireAdmin";
 import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
@@ -16,6 +17,7 @@ import TopUp from "./pages/TopUp";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import Studio from "./pages/Studio";
@@ -54,6 +56,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+            <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
             <Route path="/game/:id" element={<GameDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
