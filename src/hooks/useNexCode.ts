@@ -23,6 +23,7 @@ interface UseNexCode {
   running: boolean;
   blocked: string | null;
   error: string | null;
+  generationId: string | null;
   clear: () => void;
   pushLine: (level: NexCodeLevel, text: string) => void;
   run: (prompt: string, token: string | null | undefined) => Promise<GeneratedGame | null>;
@@ -33,6 +34,7 @@ export function useNexCode(): UseNexCode {
   const [running, setRunning] = useState(false);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generationId, setGenerationId] = useState<string | null>(null);
   const idRef = useRef(0);
 
   const push = useCallback((level: NexCodeLevel, text: string) => {
@@ -44,6 +46,7 @@ export function useNexCode(): UseNexCode {
     setLines([]);
     setBlocked(null);
     setError(null);
+    setGenerationId(null);
   }, []);
 
   const run = useCallback(
@@ -51,6 +54,7 @@ export function useNexCode(): UseNexCode {
       setRunning(true);
       setBlocked(null);
       setError(null);
+      setGenerationId(null);
 
       if (!token) {
         push("error", "You need to sign in before NexCode can build a game.");
@@ -106,6 +110,7 @@ export function useNexCode(): UseNexCode {
               push("error", "NexCode cancelled this request.");
             } else if (evt.type === "result") {
               game = evt.game as GeneratedGame;
+              if (typeof evt.generationId === "string") setGenerationId(evt.generationId);
               push("ok", `Built “${evt.game?.title}”.`);
             } else if (evt.type === "error") {
               push("error", evt.message);
@@ -127,5 +132,5 @@ export function useNexCode(): UseNexCode {
     [push]
   );
 
-  return { lines, running, blocked, error, clear, pushLine: push, run };
+  return { lines, running, blocked, error, generationId, clear, pushLine: push, run };
 }
