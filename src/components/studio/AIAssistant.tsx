@@ -28,6 +28,7 @@ export function AIAssistant({ config, onApplyCode }: Props) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("nexstudio_ai_key") || "");
   const [apiBase, setApiBase] = useState(() => localStorage.getItem("nexstudio_ai_base") || "https://api.openai.com/v1");
   const [model, setModel] = useState(() => localStorage.getItem("nexstudio_ai_model") || "gpt-3.5-turbo");
+  const [mode, setMode] = useState<"chat" | "generate" | "edit">("generate");
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -42,16 +43,19 @@ export function AIAssistant({ config, onApplyCode }: Props) {
   }, [apiKey, apiBase, model]);
 
   const systemPrompt = `You are an AI assistant for NexPlay Studio, a Blender-style 2D/3D game editor.
-You can:
-- Generate and explain code (JavaScript/TypeScript) for modifying games
-- Suggest improvements to gameplay, visuals, and mechanics
-- Answer questions about the editor
+Your job is to help the user create, modify, and describe game objects and scenes by generating Python-like or executable instructions, but also respond clearly in natural language.
+${mode === "generate" ? "- Focus on generating objects/scenes based on description. Be concrete and actionable." : mode === "edit" ? "- Focus on editing/modifying existing elements." : "- General chat about the editor and game design."}
 
 Current game config: ${JSON.stringify(config, null, 2)}
 
-Respond in clear markdown. When generating code, wrap it in \`\`\`javascript\`\`\` or \`\`\`typescript\`\`\`.`;
+Respond in clear markdown. When you generate code to modify the scene, wrap it in \`\`\`javascript\`\`\` or \`\`\`typescript\`\`\` so it can be applied.`;
 
-  const sendMessage = async () => {
+  const welcomeMsg =
+    mode === "generate"
+      ? "Describe what you want to create (e.g., 'create a spinning cube', 'make a 2D platformer level')."
+      : mode === "edit"
+      ? "Tell me what to change (e.g., 'make player faster', 'add more collectibles')."
+      : "Ask anything about NexPlay Studio or your game.";
     if (!input.trim() || loading) return;
     const userMsg = { role: "user" as const, content: input.trim() };
     setMessages((prev) => [...prev, userMsg]);
