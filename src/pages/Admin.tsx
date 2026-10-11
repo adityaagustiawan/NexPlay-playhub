@@ -50,6 +50,13 @@ import {
   moderationStatus,
   type ReportRow,
 } from "@/lib/moderation";
+import {
+  devcoinsToUsd,
+  formatDevcoins,
+  formatUsd,
+  payoutStatusLabel,
+} from "@/lib/devcoins";
+import { fetchPendingPayouts, resolvePayout, type DevcoinPayout } from "@/lib/devcoinsApi";
 
 interface ModProfile {
   user_id: string;
@@ -80,6 +87,7 @@ const Admin = () => {
   const [profiles, setProfiles] = useState<ModProfile[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [payouts, setPayouts] = useState<DevcoinPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
