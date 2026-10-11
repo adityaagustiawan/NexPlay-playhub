@@ -32,7 +32,7 @@ const MAX_PROMPT_LENGTH = 600;
 const RULES: { category: PolicyCategory; re: RegExp; warning: string }[] = [
   {
     category: "secrets",
-    re: /\b(env(ironment)?\s*vars?|process\.env|dotenv|\.env\b|secret|api[\s_-]?keys?|service[\s_-]?role|private[\s_-]?key|access[\s_-]?token|credentials?|passwords?|passwd|jwt|client[\s_-]?secret)\b/i,
+    re: /(\benv(ironment)?\s*vars?\b|process\.env|\.env\b|\bdotenv\b|\bsecrets?\b|\bapi[\s_-]?keys?\b|\bservice[\s_-]?role\b|\bprivate[\s_-]?key\b|\baccess[\s_-]?token\b|\bcredentials?\b|\bpasswords?\b|\bpasswd\b|\bjwt\b|\bclient[\s_-]?secret\b)/i,
     warning:
       "NexCode can't read environment variables, secrets, API keys or credentials. That request was cancelled.",
   },
@@ -50,7 +50,7 @@ const RULES: { category: PolicyCategory; re: RegExp; warning: string }[] = [
   },
   {
     category: "other-users",
-    re: /\b(other\s+users?|another\s+user|someone\s+else'?s?|steal\s+.*(coins?|account|data|profile)|bypass\s+(auth|login|payment|limit|tier)|escalate\s+privileges?|impersonate|admin\s+access|make\s+me\s+admin)\b/i,
+    re: /\b(other\s+users?|another\s+user|someone\s+else'?s?|steal\s+.*(coins?|account|data|profile)|bypass\s+(the\s+)?(auth|login|payment|limit|tier)|escalate\s+privileges?|impersonate|admin\s+access|make\s+me\s+admin)\b/i,
     warning:
       "NexCode can't access other players' data or bypass accounts, payments or limits. That request was cancelled.",
   },
