@@ -2,11 +2,11 @@ import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { User, Coins, Save, LogOut } from "lucide-react";
+import { User, Coins, Save, LogOut, Crown, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, signOut, refreshProfile, isPro, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(profile?.display_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
@@ -74,8 +74,33 @@ const Profile = () => {
               <Coins className="h-4 w-4 text-primary" />
               <span className="font-heading text-sm font-bold text-foreground">{profile?.coins || 0} NexCoins</span>
             </div>
+            {isPro && (
+              <div className="flex items-center gap-1 mt-1">
+                <Crown className="h-4 w-4 text-primary" />
+                <span className="font-body text-xs text-primary font-medium">
+                  Pro Creator{isAdmin && profile?.creator_tier !== "pro" ? " (admin)" : ""} — every feature unlocked
+                </span>
+              </div>
+            )}
           </div>
         </div>
+
+        {isAdmin && (
+          <button
+            onClick={() => navigate("/admin")}
+            className="w-full bg-card border border-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/50 transition-colors text-left"
+          >
+            <div className="p-2 bg-primary/15 rounded-lg">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-heading text-sm font-bold text-foreground">Admin dashboard</p>
+              <p className="font-body text-xs text-muted-foreground">
+                Review reports and suspend or ban players.
+              </p>
+            </div>
+          </button>
+        )}
 
         {/* Edit */}
         <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
