@@ -1,9 +1,33 @@
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { GameRow } from "@/components/GameRow";
-import { Sparkles, Gamepad2, TrendingUp, Star, Clock } from "lucide-react";
+import { Sparkles, Gamepad2, Clock, CheckCircle2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useAuth } from "@/hooks/useAuth";
+import { formatPlayTime, listRecentProgress, timeAgo, type GameProgress } from "@/lib/progress";
 
 const Library = () => {
+  const { user } = useAuth();
+  const [recent, setRecent] = useState<GameProgress[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      setRecent([]);
+      return;
+    }
+    let active = true;
+    listRecentProgress(user.id, 8)
+      .then((rows) => {
+        if (active) setRecent(rows);
+      })
+      .catch(() => {
+        /* best-effort: an empty shelf is fine if loading fails */
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
   return (
     <AppLayout>
       {/* Welcome Hero */}
@@ -29,7 +53,52 @@ const Library = () => {
         </div>
       </div>
 
-      {/* Recommendation Sections — all empty for now */}
+      {/* Continue Playing — the player's own saved progress, synced to their account */}
+      <GameRow
+        title="🕹️ Continue Playing"
+        isEmpty={recent.length === 0}
+        emptyMessage="No saved games yet. Play a game and your progress will be saved here — sign in with Google to pick up where you left off on any device."
+      >
+        {recent.map((p) => (
+          <NavLink
+            key={p.gameId}
+            to={`/game/${p.gameId}`}
+            className="group flex-shrink-0 w-[200px]"
+          >
+            <div className="relative aspect-square overflow-hidden rounded-xl mb-2 bg-card border border-border">
+              {p.gameImage ? (
+                <img
+                  src={p.gameImage}
+                  alt={p.gameTitle ?? "Saved game"}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-card to-card">
+                  <Gamepad2 className="h-12 w-12 text-primary/40" />
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-background/70 backdrop-blur-sm rounded-md px-2 py-1">
+                <Clock className="h-3 w-3 text-foreground" />
+                <span className="font-body text-[11px] text-foreground font-medium">
+                  {formatPlayTime(p.playSeconds)}
+                </span>
+              </div>
+              {p.completed && (
+                <div className="absolute top-2 right-2 bg-background/70 backdrop-blur-sm rounded-full p-1">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                </div>
+              )}
+            </div>
+            <h3 className="font-heading text-sm font-semibold text-foreground truncate">
+              {p.gameTitle ?? "Untitled game"}
+            </h3>
+            <p className="font-body text-xs text-muted-foreground truncate">
+              Last played {timeAgo(p.lastPlayedAt)}
+            </p>
+          </NavLink>
+        ))}
+      </GameRow>
+
       <GameRow
         title="🔥 Players' Choice"
         isEmpty
@@ -50,14 +119,6 @@ const Library = () => {
         title="✨ Recommended For You"
         isEmpty
         emptyMessage="Play some games first, and we'll recommend titles based on your taste."
-      >
-        {null}
-      </GameRow>
-
-      <GameRow
-        title="🕹️ Recently Played"
-        isEmpty
-        emptyMessage="Your recently played games will show up here."
       >
         {null}
       </GameRow>
