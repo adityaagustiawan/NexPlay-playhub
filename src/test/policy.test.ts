@@ -14,6 +14,22 @@ describe("checkPrompt — allows genuine game ideas", () => {
     expect(v.allowed).toBe(true);
     expect(v.category).toBeUndefined();
   });
+
+  // Regression: inflections used to be rejected because the vocabulary matched
+  // whole words only (\bcollect\b does not match "collecting").
+  const inflected = [
+    "a neon space catcher collecting energy cores and dodging meteors",
+    "neon space catcher",
+    "a runner jumping over obstacles and dodging traps",
+    "racing through a city while dodging traffic",
+    "a knight exploring a dungeon and collecting treasure",
+    "a fish swimming and avoiding bigger predators",
+    "a wizard casting magic and fighting monsters",
+  ];
+  it.each(inflected)("allows inflected idea: %s", (p) => {
+    const v = checkPrompt(p);
+    expect(v.allowed).toBe(true);
+  });
 });
 
 describe("checkPrompt — refuses secrets / credentials", () => {
