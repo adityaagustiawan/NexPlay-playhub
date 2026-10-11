@@ -20,6 +20,7 @@ export type Database = {
           coins: number
           created_at: string
           display_name: string | null
+          devcoins: number
           id: string
           is_banned: boolean
           public_id: string | null
