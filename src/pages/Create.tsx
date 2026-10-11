@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Send,
   ArrowRight,
+  Star,
 } from "lucide-react";
 
 const FREE_TRIAL_LIMIT = 5;
@@ -66,6 +67,9 @@ const Create = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ pkg: GamePackage; gameKey: string; title: string } | null>(null);
+  const [rating, setRating] = useState(0);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [rated, setRated] = useState(false);
   const renderCheckedRef = useRef<Set<string>>(new Set());
 
   const atLimit = !isPro && myGames.length >= FREE_TRIAL_LIMIT;
@@ -106,6 +110,8 @@ const Create = () => {
     }
 
     nexcode.clear();
+    setRated(false);
+    setRating(0);
     const game = await nexcode.run(prompt.trim(), session?.access_token);
     if (!game) return; // blocked or failed — terminal already shows why
 
