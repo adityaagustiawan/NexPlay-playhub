@@ -34,6 +34,7 @@ import { OperatorSearch, type StudioOperator } from "@/components/studio/Operato
 import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
 import { AIAssistant } from "@/components/studio/AIAssistant";
+import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
   Box,
@@ -167,6 +168,7 @@ const Studio = () => {
   const [showPanels, setShowPanels] = useState(true);
   const [operatorOpen, setOperatorOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [museActivity, setMuseActivity] = useState<string | null>(null);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -360,6 +362,14 @@ const Studio = () => {
     setParams({ game: g.game_key });
   };
 
+  // Muse (the AI assistant) applies a fully-formed config + reports its actions.
+  const applyMuseConfig = useCallback((next: StudioConfig, actions: MuseAction[]) => {
+    setConfig(next);
+    setNonce((n) => n + 1);
+    const n = actions.length;
+    setNotice(`Muse updated “${next.title}” — ${n} change${n === 1 ? "" : "s"}. Save to keep it.`);
+  }, []);
+
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
 
@@ -400,6 +410,7 @@ const Studio = () => {
     },
     { id: "file.new", label: "File: New Game", hint: "Ctrl+N", run: newGame },
     { id: "view.ai", label: "View: Toggle AI Assistant", hint: "Shift+A", run: () => setShowAIAssistant((v) => !v) },
+    { id: "ai.muse", label: "Muse: Build / edit with AI", hint: "Shift+A", run: () => setShowAIAssistant(true) },
     { id: "view.front", label: "View: Front", hint: "Numpad 1", run: () => viewportRef.current?.setView("front") },
     { id: "view.right", label: "View: Right", hint: "Numpad 3", run: () => viewportRef.current?.setView("right") },
     { id: "view.top", label: "View: Top", hint: "Numpad 7", run: () => viewportRef.current?.setView("top") },
@@ -569,11 +580,22 @@ const Studio = () => {
     {
       label: "Window",
       items: [
-        { label: "AI Assistant", shortcut: "Shift+A", onSelect: () => setShowAIAssistant((v) => !v), checked: showAIAssistant },
+        { label: "Muse AI Assistant", shortcut: "Shift+A", onSelect: () => setShowAIAssistant((v) => !v), checked: showAIAssistant },
         { separator: true },
         { label: "Fullscreen", onSelect: toggleFullscreen },
         { separator: true },
         { label: "Reload viewport", onSelect: () => setNonce((n) => n + 1) },
+      ],
+    },
+    {
+      label: "AI",
+      items: [
+        { label: "Toggle Muse assistant", shortcut: "Shift+A", onSelect: () => setShowAIAssistant((v) => !v), checked: showAIAssistant },
+        { label: "Open Muse (Build mode)", onSelect: () => setShowAIAssistant(true) },
+        { separator: true },
+        { label: "Offline Muse works with no API key", disabled: true },
+        { label: "Free models: Pollinations · Groq · Cerebras · OpenRouter", disabled: true },
+        { label: "Local CLI bridge: Ollama · LM Studio · g4f", disabled: true },
       ],
     },
     {
