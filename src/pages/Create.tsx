@@ -57,11 +57,11 @@ function slugify(title: string): string {
 }
 
 const Create = () => {
-  const { user, session, profile } = useAuth();
+  // isPro already counts admins as Pro (they get every feature).
+  const { user, session, profile, isPro, isBlocked } = useAuth();
   const navigate = useNavigate();
   const nexcode = useNexCode();
 
-  const isPro = profile?.creator_tier === "pro";
   const [prompt, setPrompt] = useState("");
   const [myGames, setMyGames] = useState<Game[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
