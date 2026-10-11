@@ -4,6 +4,7 @@
 // On reload: local first, then cloud.
 
 import { supabase } from "@/integrations/supabase/client";
+import { asJson } from "@/lib/supabaseJson";
 import { eventBus, EngineEvents } from "@/engine/eventBus";
 
 const AUTOSAVE_INTERVAL_MS = 5000;
