@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Wallet,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
