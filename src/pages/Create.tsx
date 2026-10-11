@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Send,
   ArrowRight,
+  Star,
 } from "lucide-react";
 
 const FREE_TRIAL_LIMIT = 5;
@@ -66,6 +67,9 @@ const Create = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ pkg: GamePackage; gameKey: string; title: string } | null>(null);
+  const [rating, setRating] = useState(0);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [rated, setRated] = useState(false);
   const renderCheckedRef = useRef<Set<string>>(new Set());
 
   const atLimit = !isPro && myGames.length >= FREE_TRIAL_LIMIT;
@@ -106,6 +110,8 @@ const Create = () => {
     }
 
     nexcode.clear();
+    setRated(false);
+    setRating(0);
     const game = await nexcode.run(prompt.trim(), session?.access_token);
     if (!game) return; // blocked or failed — terminal already shows why
 
@@ -144,6 +150,34 @@ const Create = () => {
       title: game.title,
     });
     setNotice(`“${game.title}” was verified and is ready to play below.`);
+  };
+
+  const handleRate = async (value: number) => {
+    const generationId = nexcode.generationId;
+    if (!generationId || !session?.access_token) return;
+    setRating(value);
+    setRatingBusy(true);
+    try {
+      const res = await fetch("/api/nexcode-feedback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ generationId, rating: value }),
+      });
+      if (res.ok) {
+        setRated(true);
+        nexcode.pushLine("ok", `Feedback saved (${value}/5) — NexCode will learn from this.`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(`Could not save rating: ${data?.error ?? res.status}`);
+      }
+    } catch {
+      setError("Could not save rating.");
+    } finally {
+      setRatingBusy(false);
+    }
   };
 
   const handleSubmit = async (game: Game) => {
