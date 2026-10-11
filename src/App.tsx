@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,8 +18,20 @@ import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
+import Studio from "./pages/Studio";
 
 const queryClient = new QueryClient();
+
+/**
+ * Landing (nexconsole) or the editor (nexstudio) depending on the hostname.
+ * The same build serves both domains; nexstudio.vercel.app lands in the studio.
+ */
+const RootRoute = () => {
+  if (typeof window !== "undefined" && window.location.hostname.startsWith("nexstudio.")) {
+    return <Navigate to="/studio" replace />;
+  }
+  return <Landing />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -29,7 +41,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<RootRoute />} />
+            <Route path="/studio" element={<Studio />} />
             <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<Create />} />
