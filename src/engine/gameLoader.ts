@@ -2,6 +2,7 @@
 // Game package shape: { gameplay, assets, scripts? }
 
 import { supabase } from "@/integrations/supabase/client";
+import { asRecord } from "@/lib/supabaseJson";
 
 export interface GamePackage {
   gameplay: Record<string, unknown>;
@@ -46,8 +47,8 @@ export async function loadGamePackage(gameKey: string): Promise<GamePackage> {
   }
 
   return {
-    gameplay: data.gameplay ?? {},
-    assets: data.assets ?? {},
+    gameplay: asRecord(data.gameplay),
+    assets: asRecord(data.assets),
     title: data.title,
     version: data.version,
   };
@@ -68,5 +69,19 @@ export async function loadGameRecord(gameKey: string): Promise<GameRecord | null
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    game_key: data.game_key,
+    title: data.title,
+    description: data.description,
+    gameplay: asRecord(data.gameplay),
+    assets: asRecord(data.assets),
+    version: data.version,
+    released_at: data.released_at,
+    user_id: data.user_id,
+    status: data.status,
+    is_draft: data.is_draft,
+  };
 }
