@@ -47,8 +47,10 @@ async function run(width, height, label) {
   await input.press("Enter");
 
   r.overlaySeen = await page.getByText(/AI working on/i).first().isVisible().catch(() => false);
-  await page.getByText(/Muse used \d+ tool/).first().waitFor({ timeout: 20000 });
-  r.toolSummary = await page.getByText(/Muse used \d+ tool/).first().innerText();
+  const toolHeader = page.getByText(/Muse used \d+ tool/).first();
+  await toolHeader.waitFor({ timeout: 20000 });
+  r.toolSummary = (await toolHeader.locator("..").innerText()).replace(/\s+/g, " ").trim();
+  r.mentionsDescription = /description/i.test(r.toolSummary);
   await page.waitForTimeout(800);
   r.titleApplied = (await page.getByText(/Nova/).count()) > 0;
   r.statusLooks3DShooter = /3D · shooter/.test(await page.locator("body").innerText());
@@ -59,6 +61,7 @@ async function run(width, height, label) {
     r.promptBarVisible &&
     r.titleApplied &&
     r.statusLooks3DShooter &&
+    !r.mentionsDescription &&
     errors.length === 0;
 
   await page.close();
