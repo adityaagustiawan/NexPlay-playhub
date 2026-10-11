@@ -98,12 +98,19 @@ function detectTheme(p: string): keyof typeof THEMES | null {
   return null;
 }
 
-function detectTitle(prompt: string, mode: Mode, dim: Dimension, themeKey: keyof typeof THEMES | null): string {
+function detectTitle(
+  prompt: string,
+  mode: Mode,
+  dim: Dimension,
+  themeKey: keyof typeof THEMES | null,
+  subject: string | null,
+): string {
   const explicit = prompt.match(/(?:called|named|titled?|title\s*[:=])\s*["']?([^"'\n,.]{2,40})["']?/i);
   if (explicit) return titleCase(explicit[1].trim());
   const quoted = prompt.match(/["']([^"']{2,40})["']/);
   if (quoted) return titleCase(quoted[1].trim());
   const noun = mode === "shooter" ? "Shooter" : mode === "runner" ? "Runner" : "Catcher";
+  if (subject) return `${titleCase(subject)} ${noun}`;
   const prefix =
     themeKey && themeKey !== "mono" ? titleCase(themeKey) : dim === "3d" ? "Voxel" : "Neon";
   return `${prefix} ${noun}`;
@@ -129,10 +136,36 @@ function detectSpeed(p: string): number | null {
   return null;
 }
 
+/** Pull object nouns out of phrases like "collect gems" / "avoid spikes". */
+function detectElementNames(prompt: string): { good?: string; bad?: string } {
+  const p = prompt.toLowerCase();
+  const good = p.match(
+    /(?:collect(?:ing)?|grab(?:bing)?|gather(?:ing)?|pick up|catch(?:ing)?|save|rescue)\s+(?:the\s+|some\s+|a\s+|an\s+)?([a-z]{3,})/,
+  );
+  const bad = p.match(
+    /(?:avoid(?:ing)?|dodge|dodging|escape|escaping|shoot(?:ing)?|blast(?:ing)?|destroy(?:ing)?|defeat(?:ing)?|kill(?:ing)?|fight(?:ing)?)\s+(?:the\s+|some\s+|a\s+|an\s+)?([a-z]{3,})/,
+  );
+  return {
+    good: good?.[1] ? titleCase(good[1]) : undefined,
+    bad: bad?.[1] ? titleCase(bad[1]) : undefined,
+  };
+}
+
+/** "a game about a cat" / "you are a robot" → "cat" / "robot". */
+function detectSubject(prompt: string): string | null {
+  const m = prompt.match(/\b(?:about|playing as|you(?:'re| are)|where you(?:'re| are))\s+(?:a|an|the)?\s*([a-z]{3,})/i);
+  return m ? m[1] : null;
+}
+
+/** Only touch the description when the user explicitly asks for one. */
+function detectDescription(prompt: string): string | null {
+  const m = prompt.match(/(?:description|desc|subtitle)\s*(?:to|as|:|=)?\s*["']([^"']{2,200})["']/i);
+  return m ? m[1].trim() : null;
+}
+
 /** Plan a whole game from a free-text prompt, with no network access. */
 export function planGame(prompt: string, base: StudioConfig = DEFAULT_CONFIG): MusePlan {
   const p = prompt.toLowerCase();
-  const actions: MuseAction[] = [];
 
   const dimension = detectDimension(p);
   const mode = detectMode(p);
@@ -146,17 +179,22 @@ export function planGame(prompt: string, base: StudioConfig = DEFAULT_CONFIG): M
   const speed = detectSpeed(p) ?? factors.speed;
   const spawnMs = factors.spawnMs;
 
-  const title = detectTitle(prompt, mode, dimension, themeKey);
+  const subject = detectSubject(prompt);
+  const title = detectTitle(prompt, mode, dimension, themeKey, subject);
+  // The prompt only changes the description when the user explicitly asks for one.
+  const desc = detectDescription(prompt);
 
-  // Names derived from the mode, with a light nod to the prompt's theme word.
-  const goodName = mode === "shooter" ? "Targets" : mode === "runner" ? "Pickups" : "Coins";
-  const badName = mode === "shooter" ? "Enemies" : mode === "runner" ? "Obstacles" : "Hazards";
-  const names = { player: themeKey ? titleCase(themeKey) + " Hero" : base.names.player, good: goodName, bad: badName };
+  // Read the actual objects out of the prompt so it "understands" what to make.
+  const det = detectElementNames(prompt);
+  const goodName = det.good ?? (mode === "shooter" ? "Targets" : mode === "runner" ? "Pickups" : "Coins");
+  const badName = det.bad ?? (mode === "shooter" ? "Enemies" : mode === "runner" ? "Obstacles" : "Hazards");
+  const playerName = subject ? titleCase(subject) : themeKey ? titleCase(themeKey) + " Hero" : base.names.player;
+  const names = { player: playerName, good: goodName, bad: badName };
 
   const config: StudioConfig = {
     ...base,
     title,
-    description: prompt.trim() || base.description,
+    ...(desc ? { description: desc } : {}),
     mode,
     dimension,
     difficulty,
@@ -168,17 +206,10 @@ export function planGame(prompt: string, base: StudioConfig = DEFAULT_CONFIG): M
     names,
   };
 
-  actions.push({ tool: "set_dimension", label: `Set viewport to ${dimension.toUpperCase()}` });
-  actions.push({ tool: "set_mode", label: `Game mode → ${mode}` });
-  actions.push({ tool: "set_difficulty", label: `Difficulty → ${difficulty}` });
-  if (themeKey) actions.push({ tool: "set_theme", label: `Applied the "${themeKey}" theme` });
-  actions.push({ tool: "set_goal", label: `Goal → ${goal} · Levels → ${levels}` });
-  actions.push({ tool: "set_speed", label: `Speed → ${speed.toFixed(1)} · Spawn every ${spawnMs}ms` });
-  actions.push({ tool: "set_name", label: `Named it “${title}”` });
-
   return {
     config,
-    actions,
+    // Report exactly what changed, rather than a fixed script.
+    actions: diffConfig(base, config),
     rationale: `Built a ${difficulty} ${dimension.toUpperCase()} ${mode} game named “${title}”.`,
     source: "offline",
   };
