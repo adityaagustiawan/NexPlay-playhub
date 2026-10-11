@@ -8,6 +8,7 @@ import {
   X,
   Gamepad2,
   Wrench,
+  Boxes,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
