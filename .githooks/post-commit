@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+# Auto-ship hook: after every commit, push HEAD to main so Vercel redeploys
+# automatically. Enabled via: git config core.hooksPath .githooks
+#
+# Turn it off for a single commit:
+#     NEXCONSOLE_AUTOSHIP=0 git commit -m "wip"
+# Turn it off entirely:
+#     git config --unset core.hooksPath
+# Re-enable later:
+#     git config core.hooksPath .githooks
+
+[ "${NEXCONSOLE_AUTOSHIP:-1}" = "0" ] && exit 0
+
+# Skip while a rebase/merge is in progress so we never push half-done history.
+gitdir="$(git rev-parse --git-dir 2>/dev/null || echo .git)"
+[ -d "$gitdir/rebase-merge" ] && exit 0
+[ -d "$gitdir/rebase-apply" ] && exit 0
+git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0
+
+if git push origin HEAD:main >/dev/null 2>&1; then
+  echo "  auto-ship: pushed to main → Vercel is redeploying."
+else
+  echo "  auto-ship: could not push to main (run 'npm run ship' to retry)."
+fi
+exit 0
