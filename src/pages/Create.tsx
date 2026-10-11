@@ -27,6 +27,8 @@ import {
   Send,
   ArrowRight,
   Star,
+  Wrench,
+  Pencil,
 } from "lucide-react";
 
 const FREE_TRIAL_LIMIT = 5;
@@ -228,14 +230,19 @@ const Create = () => {
               playable in seconds.
             </p>
           </div>
-          {/* Trial / Pro badge */}
-          <div
-            className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full font-body text-sm font-semibold ${
-              isPro ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            {isPro ? <Crown className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-            {isPro ? "Pro Creator — unlimited" : `Trial ${myGames.length}/${FREE_TRIAL_LIMIT}`}
+          {/* Trial / Pro badge + Studio */}
+          <div className="shrink-0 flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate("/studio")}>
+              <Wrench className="h-4 w-4 mr-1" /> Studio
+            </Button>
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-body text-sm font-semibold ${
+                isPro ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              {isPro ? <Crown className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              {isPro ? "Pro Creator — unlimited" : `Trial ${myGames.length}/${FREE_TRIAL_LIMIT}`}
+            </div>
           </div>
         </div>
 
