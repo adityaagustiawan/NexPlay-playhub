@@ -34,6 +34,7 @@ import { OperatorSearch, type StudioOperator } from "@/components/studio/Operato
 import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
 import { AIAssistant } from "@/components/studio/AIAssistant";
+import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
   Box,
@@ -167,6 +168,7 @@ const Studio = () => {
   const [showPanels, setShowPanels] = useState(true);
   const [operatorOpen, setOperatorOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [museActivity, setMuseActivity] = useState<string | null>(null);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [myGames, setMyGames] = useState<GameSummary[]>([]);
@@ -359,6 +361,14 @@ const Studio = () => {
     setOpenDialog(false);
     setParams({ game: g.game_key });
   };
+
+  // Muse (the AI assistant) applies a fully-formed config + reports its actions.
+  const applyMuseConfig = useCallback((next: StudioConfig, actions: MuseAction[]) => {
+    setConfig(next);
+    setNonce((n) => n + 1);
+    const n = actions.length;
+    setNotice(`Muse updated “${next.title}” — ${n} change${n === 1 ? "" : "s"}. Save to keep it.`);
+  }, []);
 
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
