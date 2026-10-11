@@ -10,6 +10,7 @@ import { useNexCode } from "@/hooks/useNexCode";
 import { NexCodeTerminal } from "@/components/NexCodeTerminal";
 import { GamePreview } from "@/components/GamePreview";
 import type { GamePackage } from "@/engine/gameLoader";
+import { asJson } from "@/lib/supabaseJson";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -115,8 +116,8 @@ const Create = () => {
       game_key: gameKey,
       title: game.title,
       description: game.description,
-      gameplay: game.gameplay,
-      assets: game.assets,
+      gameplay: asJson(game.gameplay),
+      assets: asJson(game.assets),
       version: 1,
       released_at: null,
       status: "draft",

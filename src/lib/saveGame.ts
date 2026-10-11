@@ -4,6 +4,7 @@
 // On reload: local first, then cloud.
 
 import { supabase } from "@/integrations/supabase/client";
+import { asJson } from "@/lib/supabaseJson";
 import { eventBus, EngineEvents } from "@/engine/eventBus";
 
 const AUTOSAVE_INTERVAL_MS = 5000;
@@ -102,7 +103,7 @@ export async function saveGameState(
         {
           game_id: game.id,
           player_id: playerId,
-          data: state,
+          data: asJson(state),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "game_id,player_id" }
