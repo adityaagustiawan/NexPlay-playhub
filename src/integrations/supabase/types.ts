@@ -47,6 +47,126 @@ export type Database = {
         }
         Relationships: []
       }
+      age_verifications: {
+        Row: {
+          bracket: string
+          captcha_passed: boolean
+          created_at: string
+          declared_age: number
+          dev_agreement_accepted: boolean
+          device_hash: string
+          guardian_acknowledged: boolean
+          id: string
+          parental_control_notice: boolean
+          policy_accepted: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bracket: string
+          captcha_passed?: boolean
+          created_at?: string
+          declared_age: number
+          dev_agreement_accepted?: boolean
+          device_hash: string
+          guardian_acknowledged?: boolean
+          id?: string
+          parental_control_notice?: boolean
+          policy_accepted?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bracket?: string
+          captcha_passed?: boolean
+          created_at?: string
+          declared_age?: number
+          dev_agreement_accepted?: boolean
+          device_hash?: string
+          guardian_acknowledged?: boolean
+          id?: string
+          parental_control_notice?: boolean
+          policy_accepted?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creator_agreements: {
+        Row: {
+          accepted_at: string
+          declared_age: number | null
+          device_hash: string | null
+          policy_version: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          declared_age?: number | null
+          device_hash?: string | null
+          policy_version: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          declared_age?: number | null
+          device_hash?: string | null
+          policy_version?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      game_progress: {
+        Row: {
+          completed: boolean
+          created_at: string
+          game_id: string
+          game_image: string | null
+          game_title: string | null
+          id: string
+          last_played_at: string
+          level: number
+          play_seconds: number
+          progress: Json
+          score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          game_id: string
+          game_image?: string | null
+          game_title?: string | null
+          id?: string
+          last_played_at?: string
+          level?: number
+          play_seconds?: number
+          progress?: Json
+          score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          game_id?: string
+          game_image?: string | null
+          game_title?: string | null
+          id?: string
+          last_played_at?: string
+          level?: number
+          play_seconds?: number
+          progress?: Json
+          score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
