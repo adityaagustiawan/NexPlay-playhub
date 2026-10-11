@@ -15,6 +15,7 @@ import { checkPrompt } from "../lib/server/policy.js";
 import { generateGame, generateLocal } from "../lib/server/generator.js";
 import { verifyGame } from "../lib/server/verify.js";
 import { getAdminClient } from "../lib/server/admin.js";
+import { getTopExamples, toFewShot, recordGeneration } from "../lib/server/learning.js";
 
 export const config = { runtime: "nodejs" } as const;
 
@@ -65,8 +66,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!verdict.allowed) {
       return json({ blocked: true, category: verdict.category, reason: verdict.reason, message: verdict.warning }, 200);
     }
-    const game = await generateGame(prompt);
-    return json({ game }, 200);
+    const references = await buildReferences(prompt);
+    const game = await generateGame(prompt, references);
+    const generationId = await recordGeneration({ userId: userData.user.id, prompt, game });
+    return json({ game, generationId }, 200);
   }
 
   // 4) Stream a terminal-style build log.
@@ -103,7 +106,13 @@ export async function POST(request: Request): Promise<Response> {
         await say("Choosing a genre and theme…", "info", 420);
         await say("Scaffolding the scene…", "info", 420);
 
-        let game = await generateGame(prompt);
+        const references = await buildReferences(prompt);
+        if (references) {
+          const n = references.split("\n").length;
+          await say(`Learning from ${n} highly-rated past game${n === 1 ? "" : "s"}…`, "dim", 260);
+        }
+
+        let game = await generateGame(prompt, references);
 
         await say(`Assembling “${game.title}”…`, "info", 360);
         await say("Compiling gameplay config…", "info", 340);
