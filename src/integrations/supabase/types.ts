@@ -20,6 +20,7 @@ export type Database = {
           coins: number
           created_at: string
           display_name: string | null
+          devcoins: number
           id: string
           is_banned: boolean
           public_id: string | null
@@ -38,6 +39,7 @@ export type Database = {
           coins?: number
           created_at?: string
           display_name?: string | null
+          devcoins?: number
           id?: string
           is_banned?: boolean
           public_id?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           coins?: number
           created_at?: string
           display_name?: string | null
+          devcoins?: number
           id?: string
           is_banned?: boolean
           public_id?: string | null
@@ -258,6 +261,156 @@ export type Database = {
           player_id?: string
           score?: number
           created_at?: string
+        }
+        Relationships: []
+      }
+      game_items: {
+        Row: {
+          id: string
+          game_id: string
+          creator_id: string
+          name: string
+          description: string | null
+          price_coins: number
+          emoji: string | null
+          category: string | null
+          active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          creator_id: string
+          name: string
+          description?: string | null
+          price_coins?: number
+          emoji?: string | null
+          category?: string | null
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          creator_id?: string
+          name?: string
+          description?: string | null
+          price_coins?: number
+          emoji?: string | null
+          category?: string | null
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      item_purchases: {
+        Row: {
+          id: string
+          item_id: string
+          game_id: string
+          buyer_id: string
+          creator_id: string
+          price_coins: number
+          devcoins_credited: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          game_id: string
+          buyer_id: string
+          creator_id: string
+          price_coins: number
+          devcoins_credited: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          game_id?: string
+          buyer_id?: string
+          creator_id?: string
+          price_coins?: number
+          devcoins_credited?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      devcoin_ledger: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          kind: string
+          balance_after: number
+          note: string | null
+          ref_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          kind: string
+          balance_after: number
+          note?: string | null
+          ref_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          kind?: string
+          balance_after?: number
+          note?: string | null
+          ref_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      devcoin_payouts: {
+        Row: {
+          id: string
+          user_id: string
+          devcoins: number
+          amount_cents: number
+          status: string
+          method: string | null
+          note: string | null
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          devcoins: number
+          amount_cents: number
+          status?: string
+          method?: string | null
+          note?: string | null
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          devcoins?: number
+          amount_cents?: number
+          status?: string
+          method?: string | null
+          note?: string | null
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
         }
         Relationships: []
       }
