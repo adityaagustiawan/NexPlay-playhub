@@ -179,6 +179,16 @@ const Studio = () => {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OutlinerKey>("game");
 
+  // ---- 3D scene (the Blender-like editor) ----
+  const [scene, setScene] = useState<Scene>(() => createDemoScene());
+  const [objectId, setObjectId] = useState<string | null>(null);
+  const [selectedVertices, setSelectedVertices] = useState<number[]>([]);
+  const [cameraPov, setCameraPov] = useState(false);
+  const [brush, setBrush] = useState<string>("draw");
+  const [brushRadius, setBrushRadius] = useState(1.6);
+  const [brushStrength, setBrushStrength] = useState(0.4);
+  const transformMode = tool === "Rotate" ? "rotate" : tool === "Scale" ? "scale" : "move";
+
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
   const [propTab, setPropTab] = useState("scene");
