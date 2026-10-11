@@ -8,6 +8,7 @@ import {
   X,
   Gamepad2,
   Wrench,
+  Boxes,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navItems = [
   { title: "Home", url: "/library", icon: Home },
   { title: "Discover", url: "/explore", icon: Compass },
   { title: "Create", url: "/create", icon: Sparkles },
+  { title: "Nexstudio", url: "/studio", icon: Boxes },
   { title: "Top Up", url: "/topup", icon: Coins },
 ];
 
