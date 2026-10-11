@@ -50,6 +50,13 @@ import {
   moderationStatus,
   type ReportRow,
 } from "@/lib/moderation";
+import {
+  devcoinsToUsd,
+  formatDevcoins,
+  formatUsd,
+  payoutStatusLabel,
+} from "@/lib/devcoins";
+import { fetchPendingPayouts, resolvePayout, type DevcoinPayout } from "@/lib/devcoinsApi";
 
 interface ModProfile {
   user_id: string;
@@ -80,6 +87,7 @@ const Admin = () => {
   const [profiles, setProfiles] = useState<ModProfile[]>([]);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [payouts, setPayouts] = useState<DevcoinPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -95,6 +103,10 @@ const Admin = () => {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Payout resolution: which request is being worked on, and its note.
+  const [payoutBusy, setPayoutBusy] = useState<string | null>(null);
+  const [payoutNotes, setPayoutNotes] = useState<Record<string, string>>({});
+
   const profileById = useMemo(() => {
     const map = new Map<string, ModProfile>();
     for (const p of profiles) map.set(p.user_id, p);
@@ -104,7 +116,7 @@ const Admin = () => {
   const loadAll = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const [profilesRes, reportsRes, auditRes] = await Promise.all([
+    const [profilesRes, reportsRes, auditRes, payoutsRes] = await Promise.all([
       supabase
         .from("profiles")
         .select(
@@ -117,6 +129,7 @@ const Admin = () => {
         .select("id, admin_id, target_user_id, action, reason, until, created_at")
         .order("created_at", { ascending: false })
         .limit(50),
+      fetchPendingPayouts(),
     ]);
 
     if (profilesRes.error || reportsRes.error) {
@@ -125,6 +138,7 @@ const Admin = () => {
     setProfiles((profilesRes.data as ModProfile[]) ?? []);
     setReports((reportsRes.data as ReportRow[]) ?? []);
     setAudit((auditRes.data as AuditRow[]) ?? []);
+    setPayouts(payoutsRes);
     setLoading(false);
   }, []);
 
@@ -278,6 +292,27 @@ const Admin = () => {
     return { success: true };
   };
 
+  /**
+   * Approve or reject a DevCoin cash-out request. Rejecting refunds the
+   * DevCoins to the creator, approving marks it paid (paid off-platform).
+   */
+  const handlePayout = async (payout: DevcoinPayout, approve: boolean) => {
+    setPayoutBusy(payout.id);
+    try {
+      await resolvePayout(payout.id, approve, payoutNotes[payout.id]);
+      toast.success(
+        approve
+          ? `Payout marked paid — ${formatDevcoins(payout.devcoins)} DevCoins (${formatUsd(payout.amount_cents)})`
+          : `Payout rejected — ${formatDevcoins(payout.devcoins)} DevCoins refunded`
+      );
+      await loadAll();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not resolve payout");
+    } finally {
+      setPayoutBusy(null);
+    }
+  };
+
   const resolveReport = async (report: ReportRow, status: "resolved" | "dismissed") => {
     setBusy(true);
     let viaServer = true;
@@ -363,6 +398,9 @@ const Admin = () => {
             Reported players {pendingCount > 0 ? `(${pendingCount})` : ""}
           </TabsTrigger>
           <TabsTrigger value="players">All players</TabsTrigger>
+          <TabsTrigger value="payouts">
+            Cash-outs {payouts.length > 0 ? `(${payouts.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
 
