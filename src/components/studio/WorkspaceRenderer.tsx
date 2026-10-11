@@ -41,7 +41,7 @@ interface LayoutProps {
   shading: string;
   headerMenus: { label: string; items: any[] }[];
   headerMenusRender: () => ReactNode;
-  tools: { icon: any; label: string }[];
+  tools: { icon: any; label: string; tip?: string; shortcut?: string }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
   setEditMode?: (m: string) => void;
@@ -49,6 +49,7 @@ interface LayoutProps {
   setPanelWidth: (n: number) => void;
   outlinerHeight: number;
   setOutlinerHeight: (n: number) => void;
+  showTips: boolean;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -81,6 +82,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     setPanelWidth,
     outlinerHeight,
     setOutlinerHeight,
+    showTips,
   } = props;
 
   const RenderViewport = null;
