@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Send,
   ArrowRight,
+  Star,
 } from "lucide-react";
 
 const FREE_TRIAL_LIMIT = 5;
