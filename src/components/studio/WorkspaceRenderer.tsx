@@ -1,0 +1,180 @@
+// WorkspaceRenderer.tsx — swaps the editor area based on the active Blender
+// workspace. Reuses the same Blender shell, but swaps lower/side areas to
+// match Layout/Modeling/Shading/Animation/Rendering/Scripting.
+import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
+import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
+import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
+import { Timeline } from "@/components/studio/Timeline";
+import { DopeSheet } from "@/components/studio/DopeSheet";
+import { GraphEditor } from "@/components/studio/GraphEditor";
+import { NodeEditor } from "@/components/studio/NodeEditor";
+import { ImageEditor } from "@/components/studio/ImageEditor";
+import { ConsolePanel } from "@/components/studio/ConsolePanel";
+import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
+import { GamePreview } from "@/components/GamePreview";
+import type { GamePackage } from "@/engine/gameLoader";
+import { useNavigate } from "react-router-dom";
+
+export type Workspace = "Layout" | "Modeling" | "Shading" | "Animation" | "Rendering" | "Scripting";
+
+interface LayoutProps {
+  workspace: Workspace;
+  config: any;
+  pkg: GamePackage;
+  record?: any | null;
+  dimension: "2d" | "3d";
+  nonce: number;
+  selected: OutlinerKey;
+  onSelect: (k: OutlinerKey) => void;
+  propTab: string;
+  setPropTab: (id: string) => void;
+  propTabs: PropTab[];
+  propertiesContent: () => React.ReactNode;
+  showPanels: boolean;
+  showToolbar: boolean;
+  editMode: string;
+  tool: string;
+  setTool: (t: string) => void;
+  shading: string;
+  headerMenus: { label: string; items: any[] }[];
+  headerMenusRender: () => React.ReactNode;
+  tools: { icon: any; label: string }[];
+  viewportRef: React.RefObject<Viewport3DHandle>;
+  viewportBodyRef: React.RefObject<HTMLDivElement>;
+  renderViewport: () => React.ReactNode;
+}
+
+export function WorkspaceRenderer(props: LayoutProps) {
+  const navigate = useNavigate();
+  const {
+    workspace,
+    config,
+    pkg,
+    record,
+    dimension,
+    nonce,
+    selected,
+    onSelect,
+    propTab,
+    setPropTab,
+    propTabs,
+    propertiesContent,
+    showPanels,
+    showToolbar,
+    editMode,
+    tool,
+    setTool,
+    shading,
+    headerMenus,
+    headerMenusRender,
+    tools,
+    viewportRef,
+    viewportBodyRef,
+    renderViewport,
+  } = props;
+
+  const RenderViewport = renderViewport;
+  // Reusable viewport shell pieces? Keep simple: render based on workspace.
+
+  if (workspace === "Layout") {
+    return (
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-[#1d1d1d] bg-[#303030] px-2">
+            {headerMenusRender()}
+          </div>
+          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
+            {showToolbar && (
+              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                {tools.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button key={t.label} type="button" title={t.label} onClick={() => setTool(t.label)} className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}>
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className={`pointer-events-none absolute top-2 z-10 text-[11px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
+              (1) Scene Collection | {editMode}
+            </div>
+            <div className={`pointer-events-none absolute bottom-2 z-10 text-[11px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
+              {dimension === "3d" ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel: zoom" : `${config.mode} view · ${dimension.toUpperCase()}`}
+            </div>
+            <div key={`${dimension}-${nonce}`} className="h-full w-full">
+              {dimension === "3d" ? (
+                <Viewport3D ref={viewportRef} mode={config.mode} goal={config.goal} theme={config.theme} />
+              ) : (
+                <GamePreview fill pkg={pkg} title={config.title || "Untitled"} onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined} />
+              )}
+            </div>
+          </div>
+          <Timeline />
+        </div>
+        {showPanels && (
+          <div className="hidden w-[300px] shrink-0 flex-col border-l border-black md:flex">
+            <div className="h-44 min-h-0 shrink-0 overflow-hidden border-b border-black bg-[#303030]">
+              <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+            </div>
+            <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
+              {propertiesContent()}
+            </PropertiesPanel>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Shared: split vertically or show editors
+  const left = (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
+        <div key={`${dimension}-${nonce}`} className="h-full w-full">
+          {dimension === "3d" ? <Viewport3D ref={viewportRef} mode={config.mode} goal={config.goal} theme={config.theme} /> : (
+            <GamePreview fill pkg={pkg} title={config.title || "Untitled"} />
+          )}
+        </div>
+      </div>
+      {workspace === "Animation" ? (
+        <div className="flex min-h-[160px] max-h-[260px] shrink-0 flex-col border-t border-black">
+          <DopeSheet />
+          <Timeline />
+        </div>
+      ) : workspace === "Rendering" ? (
+        <div className="flex h-[180px] shrink-0 border-t border-black">
+          <NodeEditor />
+        </div>
+      ) : workspace === "Scripting" ? (
+        <div className="flex h-[200px] shrink-0 border-t border-black">
+          <ScriptingEditor />
+          <ConsolePanel />
+        </div>
+      ) : workspace === "Shading" ? (
+        <div className="flex h-[200px] shrink-0 border-t border-black">
+          <ImageEditor />
+        </div>
+      ) : (
+        <Timeline />
+      )}
+    </div>
+  );
+
+  const right = showPanels ? (
+    <div className="hidden w-[320px] shrink-0 flex-col border-l border-black md:flex">
+      <div className="h-[38vh] min-h-[200px] shrink-0 overflow-hidden border-b border-black bg-[#303030]">
+        <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+      </div>
+      <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
+        {propertiesContent()}
+      </PropertiesPanel>
+    </div>
+  ) : null;
+
+  return (
+    <div className="flex min-h-0 flex-1">
+      {left}
+      {right}
+    </div>
+  );
+}
