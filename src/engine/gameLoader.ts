@@ -2,6 +2,7 @@
 // Game package shape: { gameplay, assets, scripts? }
 
 import { supabase } from "@/integrations/supabase/client";
+import { asRecord } from "@/lib/supabaseJson";
 
 export interface GamePackage {
   gameplay: Record<string, unknown>;
@@ -46,8 +47,8 @@ export async function loadGamePackage(gameKey: string): Promise<GamePackage> {
   }
 
   return {
-    gameplay: data.gameplay ?? {},
-    assets: data.assets ?? {},
+    gameplay: asRecord(data.gameplay),
+    assets: asRecord(data.assets),
     title: data.title,
     version: data.version,
   };
