@@ -4,6 +4,7 @@
 import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
+import { ResizeGrip } from "@/components/studio/ResizeGrip";
 import { Timeline } from "@/components/studio/Timeline";
 import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
@@ -44,6 +45,10 @@ interface LayoutProps {
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
   setEditMode?: (m: string) => void;
+  panelWidth: number;
+  setPanelWidth: (n: number) => void;
+  outlinerHeight: number;
+  setOutlinerHeight: (n: number) => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -72,6 +77,10 @@ export function WorkspaceRenderer(props: LayoutProps) {
     viewportRef,
     viewportBodyRef,
     setEditMode,
+    panelWidth,
+    setPanelWidth,
+    outlinerHeight,
+    setOutlinerHeight,
   } = props;
 
   const RenderViewport = null;
@@ -114,14 +123,34 @@ export function WorkspaceRenderer(props: LayoutProps) {
           <Timeline />
         </div>
         {showPanels && (
-          <div className="hidden w-[300px] shrink-0 flex-col border-l border-black md:flex">
-            <div className="h-44 min-h-0 shrink-0 overflow-hidden border-b border-black bg-[#303030]">
-              <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+          <>
+            <ResizeGrip
+              axis="x"
+              invert
+              size={panelWidth}
+              min={220}
+              max={640}
+              onResize={setPanelWidth}
+              onReset={() => setPanelWidth(320)}
+              className="hidden md:flex"
+            />
+            <div className="hidden shrink-0 flex-col border-l border-black md:flex" style={{ width: panelWidth }}>
+              <div className="min-h-0 shrink-0 overflow-hidden bg-[#303030]" style={{ height: outlinerHeight }}>
+                <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+              </div>
+              <ResizeGrip
+                axis="y"
+                size={outlinerHeight}
+                min={80}
+                max={480}
+                onResize={setOutlinerHeight}
+                onReset={() => setOutlinerHeight(200)}
+              />
+              <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
+                {propertiesContent()}
+              </PropertiesPanel>
             </div>
-            <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
-              {propertiesContent()}
-            </PropertiesPanel>
-          </div>
+          </>
         )}
       </div>
     );
@@ -162,14 +191,34 @@ export function WorkspaceRenderer(props: LayoutProps) {
   );
 
   const right = showPanels ? (
-    <div className="hidden w-[320px] shrink-0 flex-col border-l border-black md:flex">
-      <div className="h-[38vh] min-h-[200px] shrink-0 overflow-hidden border-b border-black bg-[#303030]">
-        <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+    <>
+      <ResizeGrip
+        axis="x"
+        invert
+        size={panelWidth}
+        min={220}
+        max={640}
+        onResize={setPanelWidth}
+        onReset={() => setPanelWidth(320)}
+        className="hidden md:flex"
+      />
+      <div className="hidden shrink-0 flex-col border-l border-black md:flex" style={{ width: panelWidth }}>
+        <div className="min-h-[120px] shrink-0 overflow-hidden bg-[#303030]" style={{ height: outlinerHeight }}>
+          <Outliner title={config.title} mode={config.mode} selected={selected} onSelect={(k) => { onSelect(k as OutlinerKey); setPropTab("object"); }} />
+        </div>
+        <ResizeGrip
+          axis="y"
+          size={outlinerHeight}
+          min={80}
+          max={480}
+          onResize={setOutlinerHeight}
+          onReset={() => setOutlinerHeight(200)}
+        />
+        <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
+          {propertiesContent()}
+        </PropertiesPanel>
       </div>
-      <PropertiesPanel tabs={propTabs} active={propTab} onChange={setPropTab}>
-        {propertiesContent()}
-      </PropertiesPanel>
-    </div>
+    </>
   ) : null;
 
   return (
