@@ -50,6 +50,13 @@ import {
   moderationStatus,
   type ReportRow,
 } from "@/lib/moderation";
+import {
+  devcoinsToUsd,
+  formatDevcoins,
+  formatUsd,
+  payoutStatusLabel,
+} from "@/lib/devcoins";
+import { fetchPendingPayouts, resolvePayout, type DevcoinPayout } from "@/lib/devcoinsApi";
 
 interface ModProfile {
   user_id: string;
