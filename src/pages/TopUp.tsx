@@ -1,34 +1,206 @@
 import { AppLayout } from "@/components/AppLayout";
+import { AgeGate, type AgeGateResult } from "@/components/AgeGate";
 import { topUpPackages } from "@/data/gameData";
 import { useAuth } from "@/hooks/useAuth";
-import { Coins, Zap, Gift, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { getDeviceHash } from "@/lib/device";
+import {
+  fetchStoredVerification,
+  verificationIsComplete,
+  type StoredVerification,
+} from "@/lib/ageApi";
+import {
+  bracketLabel,
+  isPackageAllowedForBracket,
+  MINOR_DAILY_CAP_USD,
+  MINOR_MAX_PACKAGE_USD,
+} from "@/lib/age";
+import {
+  Coins,
+  Zap,
+  Gift,
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  Info,
+  ShieldCheck,
+  Lock,
+  Users,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+const VERIFICATION_CODES = new Set([
+  "AGE_VERIFICATION_REQUIRED",
+  "GUARDIAN_CONSENT_REQUIRED",
+  "DEV_AGREEMENT_REQUIRED",
+  "DEVICE_UNKNOWN",
+]);
 
 const TopUp = () => {
-  const { user, profile } = useAuth();
+  const { user, session, profile, refreshProfile } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
-  const [purchased, setPurchased] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handlePurchase = () => {
-    if (selected) {
-      setPurchased(true);
-      setTimeout(() => {
-        setPurchased(false);
-        setSelected(null);
-      }, 2000);
+  // Age verification state for this device.
+  const [deviceHash, setDeviceHash] = useState<string | null>(null);
+  const [verification, setVerification] = useState<StoredVerification | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
+
+  // Handle returning from Stripe (success or cancel).
+  const params = new URLSearchParams(window.location.search);
+  const justPaid = params.get("success") === "1";
+  const cancelled = params.get("cancelled") === "1";
+
+  useEffect(() => {
+    if (justPaid) {
+      // Balance updates via the webhook; refresh to show the new coins.
+      refreshProfile();
+      window.history.replaceState({}, "", "/topup");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Resolve this device and load any stored agreement. If it's missing or
+  // incomplete the gate opens automatically.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setDeviceHash(null);
+      setVerification(null);
+      setVerified(false);
+      setChecking(false);
+      return;
+    }
+    setChecking(true);
+    getDeviceHash()
+      .then((hash) => {
+        if (cancelled) return;
+        setDeviceHash(hash);
+        return fetchStoredVerification(user.id, hash).then((stored) => {
+          if (cancelled) return;
+          setVerification(stored);
+          const complete = verificationIsComplete(stored);
+          setVerified(complete);
+          setGateOpen(!complete);
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setGateOpen(true);
+      })
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const handleVerified = useCallback(
+    async (result: AgeGateResult) => {
+      setGateOpen(false);
+      // Always trust the server's confirmation immediately; then reconcile.
+      setVerification({
+        bracket: result.bracket,
+        captcha_passed: true,
+        policy_accepted: true,
+        guardian_acknowledged: result.guardianRequired,
+        parental_control_notice: result.guardianRequired,
+        dev_agreement_accepted: result.bracket === "senior",
+      });
+      setVerified(true);
+      if (!user || !deviceHash) return;
+      try {
+        const stored = await fetchStoredVerification(user.id, deviceHash);
+        if (stored) {
+          setVerification(stored);
+          setVerified(verificationIsComplete(stored));
+        }
+      } catch {
+        // Keep the optimistic state — the server already stored the row.
+      }
+    },
+    [user, deviceHash],
+  );
+
+  const handleSelectPackage = (id: string) => {
+    if (!verified) {
+      setGateOpen(true);
+      return;
+    }
+    setSelected(id);
+  };
+
+  const handlePurchase = async () => {
+    if (!selected || loading) return;
+    if (!verified || !deviceHash) {
+      setGateOpen(true);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const token = session?.access_token;
+      if (!token) {
+        setError("You need to sign in before purchasing NexCoins.");
+        setLoading(false);
+        return;
+      }
+      const res = await fetch("/api/topup-checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ packageId: selected, deviceHash }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (VERIFICATION_CODES.has(String(data?.error))) {
+          setVerified(false);
+          setGateOpen(true);
+        }
+        setError(data?.message || data?.error || `Request failed (${res.status})`);
+        setLoading(false);
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setError("No checkout URL returned by the server.");
+      }
+    } catch {
+      setError("Can't reach the payment server. Please try again in a moment.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const bracket = verification?.bracket ?? null;
+  const isMinor = bracket === "minor";
+
   return (
     <AppLayout>
-      {purchased && (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
-          <AlertCircle className="h-16 w-16 text-accent mb-4" />
-          <h2 className="font-heading text-2xl font-bold text-foreground mb-2">Payments not connected yet</h2>
-          <p className="font-body text-muted-foreground max-w-sm">
-            This is a demo store — no real charge was made and no coins were added.
-            Connect Stripe (or another payment provider) on the server to make purchases real.
+      <AgeGate open={gateOpen} onVerified={handleVerified} onClose={() => setGateOpen(false)} />
+
+      {justPaid && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 max-w-2xl">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+          <p className="font-body text-sm text-emerald-500">
+            Payment received! Your NexCoins have been added to your account.
           </p>
+        </div>
+      )}
+      {cancelled && (
+        <div className="bg-muted border border-border rounded-xl p-4 mb-6 flex items-center gap-3 max-w-2xl">
+          <Info className="h-5 w-5 text-muted-foreground shrink-0" />
+          <p className="font-body text-sm text-muted-foreground">
+            Checkout cancelled — nothing was charged and no coins were added.
+          </p>
+        </div>
+      )}
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6 flex items-start gap-3 max-w-2xl">
+          <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+          <p className="font-body text-sm text-destructive">{error}</p>
         </div>
       )}
 
@@ -36,6 +208,55 @@ const TopUp = () => {
       <p className="font-body text-muted-foreground mb-8">
         Get NexCoins to purchase games, cosmetics, and in-game items.
       </p>
+
+      {/* Age verification status */}
+      {user && (
+        <div className="max-w-2xl mb-6">
+          {checking ? (
+            <div className="bg-muted border border-border rounded-xl p-4 flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-muted-foreground animate-spin shrink-0" />
+              <p className="font-body text-sm text-muted-foreground">
+                Checking this device…
+              </p>
+            </div>
+          ) : verified ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-start gap-3">
+              <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-heading text-sm font-bold text-emerald-500">
+                  Device verified · {bracketLabel(bracket ?? "adult")}
+                </p>
+                {isMinor && (
+                  <p className="font-body text-xs text-muted-foreground mt-1">
+                    Parent/guardian consent is recorded on this device. Up to $
+                    {MINOR_MAX_PACKAGE_USD} per purchase, ${MINOR_DAILY_CAP_USD} per
+                    day.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+              <Lock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-heading text-sm font-bold text-amber-500">
+                  Verify your age to unlock top-ups
+                </p>
+                <p className="font-body text-xs text-muted-foreground mt-1">
+                  A one-time check per device, with extra parental controls for
+                  under-18s.
+                </p>
+              </div>
+              <button
+                onClick={() => setGateOpen(true)}
+                className="bg-amber-500 text-background font-heading text-xs font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity shrink-0"
+              >
+                Verify
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Current Balance */}
       <div className="bg-card border border-border rounded-xl p-5 mb-8 flex items-center gap-4 max-w-sm">
@@ -55,50 +276,71 @@ const TopUp = () => {
         </div>
       </div>
 
+      {isMinor && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 max-w-2xl flex items-start gap-3">
+          <Users className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <p className="font-body text-xs text-muted-foreground">
+            Under-18 account: packages above ${MINOR_MAX_PACKAGE_USD} are locked.
+            Ask a parent or guardian to be present for every purchase.
+          </p>
+        </div>
+      )}
+
       {/* Packages Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {topUpPackages.map((pkg) => (
-          <button
-            key={pkg.id}
-            onClick={() => setSelected(pkg.id)}
-            className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors ${
-              selected === pkg.id ? "border-primary" : "border-border hover:border-primary/40"
-            }`}
-          >
-            {pkg.popular && (
-              <div className="absolute top-3 right-3 bg-accent text-accent-foreground font-heading text-[10px] font-bold px-2 py-1 rounded-md">
-                Popular
-              </div>
-            )}
-            <div className="flex items-center gap-3 mb-3">
-              <Coins className="h-5 w-5 text-primary" />
-              <span className="font-heading text-xl font-bold text-foreground">
-                {pkg.coins.toLocaleString()}
-              </span>
-            </div>
-            {pkg.bonus > 0 && (
-              <div className="flex items-center gap-1 mb-3">
-                <Gift className="h-3 w-3 text-accent" />
-                <span className="font-body text-xs text-accent font-medium">
-                  +{pkg.bonus} bonus
+        {topUpPackages.map((pkg) => {
+          const allowed = !isMinor || isPackageAllowedForBracket("minor", pkg.price);
+          return (
+            <button
+              key={pkg.id}
+              onClick={() => allowed && handleSelectPackage(pkg.id)}
+              disabled={loading || !allowed}
+              className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                selected === pkg.id ? "border-primary" : "border-border hover:border-primary/40"
+              }`}
+            >
+              {pkg.popular && allowed && (
+                <div className="absolute top-3 right-3 bg-accent text-accent-foreground font-heading text-[10px] font-bold px-2 py-1 rounded-md">
+                  Popular
+                </div>
+              )}
+              {!allowed && (
+                <div className="absolute top-3 right-3 bg-muted text-muted-foreground font-heading text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  Under 18
+                </div>
+              )}
+              <div className="flex items-center gap-3 mb-3">
+                <Coins className="h-5 w-5 text-primary" />
+                <span className="font-heading text-xl font-bold text-foreground">
+                  {pkg.coins.toLocaleString()}
                 </span>
               </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="font-heading text-lg text-foreground">${pkg.price}</span>
-              <Zap className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </button>
-        ))}
+              {pkg.bonus > 0 && (
+                <div className="flex items-center gap-1 mb-3">
+                  <Gift className="h-3 w-3 text-accent" />
+                  <span className="font-body text-xs text-accent font-medium">
+                    +{pkg.bonus} bonus
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="font-heading text-lg text-foreground">${pkg.price}</span>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {selected && (
         <button
           onClick={handlePurchase}
-          className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity"
+          disabled={loading}
+          className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity disabled:opacity-60"
         >
-          <Coins className="h-5 w-5" />
-          Purchase Now
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Coins className="h-5 w-5" />}
+          {loading ? "Opening secure checkout…" : verified ? "Purchase Now" : "Verify to continue"}
         </button>
       )}
     </AppLayout>
