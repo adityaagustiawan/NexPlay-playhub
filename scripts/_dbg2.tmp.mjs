@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const p = await b.newPage();
+p.on("console", (m) => console.log(`[${m.type()}]`, m.text()));
+p.on("pageerror", (e) => console.log("[pageerror]", e.message));
+p.on("requestfailed", (r) => console.log("[reqfail]", r.url().slice(0, 100), r.failure()?.errorText));
+await p.goto("https://getnexstudio.vercel.app/", { waitUntil: "networkidle" });
+await p.waitForTimeout(2500);
+console.log("url", p.url());
+console.log("root html len", (await p.locator("#root").innerHTML()).length);
+await p.screenshot({ path: "/tmp/opencode/studio-dbg.png", fullPage: false });
+await b.close();
