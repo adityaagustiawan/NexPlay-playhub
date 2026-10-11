@@ -34,6 +34,8 @@ import { OperatorSearch, type StudioOperator } from "@/components/studio/Operato
 import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
 import { AIAssistant } from "@/components/studio/AIAssistant";
+import { MusePromptBar } from "@/components/studio/MusePromptBar";
+import { useMuse } from "@/hooks/useMuse";
 import type { MuseAction } from "@/lib/musePlan";
 import {
   AlertTriangle,
@@ -370,6 +372,9 @@ const Studio = () => {
     const n = actions.length;
     setNotice(`Muse updated “${next.title}” — ${n} change${n === 1 ? "" : "s"}. Save to keep it.`);
   }, []);
+
+  // One shared Muse conversation, driven by either the side panel or the prompt bar.
+  const muse = useMuse(config, applyMuseConfig, setMuseActivity);
 
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
@@ -1011,10 +1016,11 @@ const Studio = () => {
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
           />
+          {showAIAssistant && <MusePromptBar muse={muse} />}
         </div>
         {showAIAssistant && (
-          <div className="hidden w-[340px] shrink-0 flex-col border-l border-black xl:flex">
-            <AIAssistant config={config} onApplyConfig={applyMuseConfig} onActivity={setMuseActivity} />
+          <div className="hidden w-[340px] shrink-0 flex-col border-l border-black lg:flex">
+            <AIAssistant muse={muse} />
           </div>
         )}
       </div>
