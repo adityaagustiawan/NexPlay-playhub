@@ -1,9 +1,10 @@
 // MusePromptBar.tsx — the always-on prompt bar shown under the viewport when the
 // AI is enabled. It drives the same `useMuse` controller as the side panel, so
-// you can type a request right next to the scene. Includes example chips so it
-// is obvious how to prompt Muse.
+// you can type a request right next to the scene. It also reports what Muse did
+// (even when the side panel is hidden) and shows example chips so it is obvious
+// how to prompt.
 import { useState } from "react";
-import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Wrench, Check } from "lucide-react";
 import { MUSE_MODES, type MuseController } from "@/hooks/useMuse";
 
 interface Props {
@@ -11,11 +12,11 @@ interface Props {
 }
 
 export function MusePromptBar({ muse }: Props) {
-  const { mode, setMode, loading, messages, send } = muse;
+  const { mode, setMode, loading, messages, actions, send } = muse;
   const [input, setInput] = useState("");
 
   const active = MUSE_MODES.find((m) => m.id === mode) ?? MUSE_MODES[0];
-  const showExamples = messages.length <= 1 && !input;
+  const showExamples = actions.length === 0 && messages.length <= 1 && !input;
 
   const submit = (text: string) => {
     const t = text.trim();
@@ -26,6 +27,19 @@ export function MusePromptBar({ muse }: Props) {
 
   return (
     <div className="shrink-0 border-t border-[#1d1d1d] bg-[#2b2b2b]">
+      {actions.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[#1d1d1d] bg-[#243024] px-2 py-1 text-[10px] text-[#c7e6c7]">
+          <Wrench className="h-3 w-3 shrink-0 text-[#7bd88f]" />
+          <span className="shrink-0 font-medium text-[#7bd88f]">
+            Muse used {actions.length} tool{actions.length === 1 ? "" : "s"}:
+          </span>
+          {actions.map((a, i) => (
+            <span key={i} className="flex shrink-0 items-center gap-1 rounded-full bg-[#1d2a1d] px-2 py-0.5">
+              <Check className="h-2.5 w-2.5" /> {a.label}
+            </span>
+          ))}
+        </div>
+      )}
       {showExamples && (
         <div className="flex items-center gap-1.5 overflow-x-auto px-2 pt-1.5 text-[10px]">
           <span className="shrink-0 text-[#8f8f8f]">Try:</span>
