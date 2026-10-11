@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import DevCoins from "./pages/DevCoins";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import Studio from "./pages/Studio";
@@ -58,6 +59,10 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
             <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+            <Route
+              path="/devcoins"
+              element={<RequireAuth><DevCoins /></RequireAuth>}
+            />
             <Route path="/game/:id" element={<GameDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
