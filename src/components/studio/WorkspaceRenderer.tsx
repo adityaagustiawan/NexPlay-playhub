@@ -66,12 +66,10 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tool,
     setTool,
     shading,
-    headerMenus,
     headerMenusRender,
     tools,
     viewportRef,
     viewportBodyRef,
-    renderViewport,
   } = props;
 
   const RenderViewport = renderViewport;
