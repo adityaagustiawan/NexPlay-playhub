@@ -24,6 +24,8 @@ if [ "${SHIP_SKIP_CHECKS:-0}" = "1" ]; then
 else
   echo "▶ Typechecking (tsc --noEmit)…"
   npm run --silent typecheck
+  echo "▶ Testing (vitest run)…"
+  npm run --silent test
   echo "▶ Building (vite build)…"
   npm run build
   echo "✔ Checks passed."
