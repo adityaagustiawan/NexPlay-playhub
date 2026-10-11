@@ -37,10 +37,27 @@ describe("planGame (offline Muse)", () => {
     expect(plan.config.title.length).toBeGreaterThan(0);
   });
 
-  it("keeps base fields it does not touch", () => {
-    const plan = planGame("make a game", { ...DEFAULT_CONFIG, description: "keep me" });
-    // description is overwritten by the prompt text, but theme stays if no theme word
-    expect(plan.config.theme).toBeDefined();
+  it("does not overwrite the description with the prompt", () => {
+    const plan = planGame("make a game about a cat", { ...DEFAULT_CONFIG, description: "keep me" });
+    expect(plan.config.description).toBe("keep me");
+  });
+
+  it("only writes a description when explicitly asked", () => {
+    const plan = planGame('a game called "Paws" and set the description to "Catch the mice"');
+    expect(plan.config.description).toBe("Catch the mice");
+  });
+
+  it("reads the objects out of the prompt", () => {
+    const plan = planGame("dodge spikes and collect gems");
+    expect(plan.config.names.good).toBe("Gems");
+    expect(plan.config.names.bad).toBe("Spikes");
+  });
+
+  it("builds a title and player from the prompt subject", () => {
+    const plan = planGame("a game about a cat where you collect yarn");
+    expect(plan.config.title).toBe("Cat Catcher");
+    expect(plan.config.names.player).toBe("Cat");
+    expect(plan.config.names.good).toBe("Yarn");
   });
 });
 

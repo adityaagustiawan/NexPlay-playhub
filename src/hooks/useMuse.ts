@@ -169,14 +169,14 @@ export function useMuse(
           await new Promise((r) => setTimeout(r, 420));
           const plan = planGame(text, config);
           // "Object" mode only places/renames things; "Build"/"Edit" retune the game.
+          const mentionsDim = /\b(2d|3d|two.?d|three.?d|voxel|fps|first.?person)\b/i.test(text);
           const next: StudioConfig =
             mode === "object"
               ? {
                   ...config,
-                  dimension: plan.config.dimension,
+                  ...(mentionsDim ? { dimension: plan.config.dimension } : {}),
                   theme: plan.config.theme,
                   names: plan.config.names,
-                  description: plan.config.description,
                 }
               : plan.config;
           const acts = diffConfig(config, next);
