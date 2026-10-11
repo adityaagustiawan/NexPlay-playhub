@@ -140,17 +140,6 @@ const Play = () => {
     };
   }, [gameKey]);
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <div className="flex flex-col items-center justify-center py-20">
-          <Gamepad2 className="h-12 w-12 text-primary mb-4 animate-pulse" />
-          <p className="font-heading text-sm text-muted-foreground">Loading game...</p>
-        </div>
-      </AppLayout>
-    );
-  }
-
   if (error) {
     return (
       <AppLayout>
@@ -187,6 +176,12 @@ const Play = () => {
             className="w-full h-[500px] block"
             style={{ imageRendering: "pixelated" }}
           />
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70">
+              <Gamepad2 className="h-12 w-12 text-primary mb-4 animate-pulse" />
+              <p className="font-heading text-sm text-muted-foreground">Loading game...</p>
+            </div>
+          )}
         </div>
 
         {liveNotice && (
