@@ -33,6 +33,7 @@ import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/stud
 import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
 import { useBlenderInput } from "@/hooks/useBlenderInput";
 import { WorkspaceRenderer, type Workspace } from "@/components/studio/WorkspaceRenderer";
+import { AIAssistant } from "@/components/studio/AIAssistant";
 import {
   AlertTriangle,
   Box,
