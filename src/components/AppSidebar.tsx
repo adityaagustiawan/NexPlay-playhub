@@ -1,4 +1,15 @@
-import { Home, Compass, Sparkles, Coins, Plus, X, Gamepad2, Wrench } from "lucide-react";
+import {
+  Home,
+  Compass,
+  Sparkles,
+  Coins,
+  Plus,
+  X,
+  Gamepad2,
+  Wrench,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
 import { BetaBadge } from "@/components/BetaBadge";
@@ -14,10 +25,20 @@ const navItems = [
 interface AppSidebarProps {
   open?: boolean;
   onClose?: () => void;
+  /** Desktop rail mode: logo/icons only, no words. Mobile drawer is always expanded. */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function AppSidebar({ open, onClose }: AppSidebarProps) {
+export function AppSidebar({ open, onClose, collapsed = false, onToggleCollapse }: AppSidebarProps) {
   const { user } = useAuth();
+
+  // Width: mobile drawer stays 220px; desktop switches between 220px and 72px.
+  const navWidth = collapsed ? "w-[220px] md:w-[72px]" : "w-[220px] md:w-[220px]";
+  // Hide text labels only when collapsed ON DESKTOP (md+), so the mobile drawer
+  // still shows words.
+  const label = collapsed ? "md:hidden" : "";
+  const iconRow = collapsed ? "md:justify-center md:gap-0 md:px-2" : "gap-3";
 
   return (
     <>
@@ -27,67 +48,94 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
       )}
 
       <nav
-        className={`fixed left-0 top-0 h-screen w-[220px] bg-sidebar border-r border-border flex flex-col py-5 z-50 transition-transform duration-200
+        className={`fixed left-0 top-0 h-screen ${navWidth} bg-sidebar border-r border-border flex flex-col py-5 z-50 transition-[transform,width] duration-200
           ${open ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        {/* Logo + close on mobile */}
-        <div className="px-5 mb-6 flex items-center justify-between">
-          <h1 className="font-heading text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Gamepad2 className="h-5 w-5 text-primary" />
-            <span>
+        {/* Logo + controls */}
+        <div
+          className={`mb-6 flex items-center ${
+            collapsed ? "px-4 md:flex-col md:justify-center md:gap-3 md:px-0" : "px-5 justify-between gap-2"
+          }`}
+        >
+          <h1
+            className="font-heading text-xl font-bold text-foreground tracking-tight flex items-center gap-2"
+            title="NEXCONSOLE"
+          >
+            <Gamepad2 className="h-5 w-5 text-primary shrink-0" />
+            <span className={label}>
               <span className="text-primary">NEX</span>CONSOLE
             </span>
-            <BetaBadge className="!py-0" />
+            <BetaBadge className={`!py-0 shrink-0 ${label}`} />
           </h1>
-          <button onClick={onClose} className="md:hidden text-muted-foreground hover:text-foreground">
+
+          {/* Desktop collapse / expand toggle */}
+          <button
+            onClick={onToggleCollapse}
+            className="hidden md:flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shrink-0"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+
+          {/* Close — mobile only */}
+          <button
+            onClick={onClose}
+            className="md:hidden text-muted-foreground hover:text-foreground shrink-0"
+            aria-label="Close menu"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Create Button */}
-        <div className="px-4 mb-6">
+        {/* Create button */}
+        <div className={`mb-6 ${collapsed ? "px-4 md:px-2" : "px-4"}`}>
           <NavLink
             to="/create"
-            className="flex items-center gap-2 bg-primary text-primary-foreground font-heading text-sm font-semibold px-4 py-3 rounded-lg w-full justify-center hover:opacity-90 transition-opacity"
+            title="Create"
+            className="flex items-center gap-2 bg-primary text-primary-foreground font-heading text-sm font-semibold px-3 py-3 rounded-lg w-full justify-center hover:opacity-90 transition-opacity"
             activeClassName="opacity-90"
             onClick={onClose}
           >
-            <Plus className="h-4 w-4" />
-            Create
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className={label}>Create</span>
           </NavLink>
         </div>
 
-        {/* Nav Items */}
-        <div className="flex flex-col gap-1 px-3 flex-1">
+        {/* Nav items */}
+        <div className={`flex flex-col gap-1 flex-1 ${collapsed ? "px-3 md:px-2" : "px-3"}`}>
           {navItems.map((item) => (
             <NavLink
               key={item.title}
               to={item.url}
               end={item.url === "/library"}
-              className="flex items-center gap-3 px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
+              title={item.title}
+              className={`flex items-center px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors ${iconRow}`}
               activeClassName="bg-secondary text-foreground"
               onClick={onClose}
             >
-              <item.icon className="h-5 w-5" />
-              <span className="font-body text-sm font-medium">{item.title}</span>
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span className={`font-body text-sm font-medium ${label}`}>{item.title}</span>
             </NavLink>
           ))}
           {user && (
             <NavLink
               to="/creator"
-              className="flex items-center gap-3 px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors"
+              title="Creator"
+              className={`flex items-center px-3 py-2.5 text-muted-foreground rounded-lg hover:bg-secondary transition-colors ${iconRow}`}
               activeClassName="bg-secondary text-foreground"
               onClick={onClose}
             >
-              <Wrench className="h-5 w-5" />
-              <span className="font-body text-sm font-medium">Creator</span>
+              <Wrench className="h-5 w-5 shrink-0" />
+              <span className={`font-body text-sm font-medium ${label}`}>Creator</span>
             </NavLink>
           )}
         </div>
 
         {/* User */}
-        <div className="px-4 mt-auto">
-          <UserFooter onNavigate={onClose} />
+        <div className={`mt-auto ${collapsed ? "px-4 md:px-2" : "px-4"}`}>
+          <UserFooter onNavigate={onClose} collapsed={collapsed} />
         </div>
       </nav>
     </>
