@@ -36,6 +36,17 @@ async function run(width, height, label) {
   }
   r.studioReady = await page.getByText(/Try:/).first().isVisible().catch(() => false);
 
+  // First-run onboarding: the opening animation + "how to use" tour should
+  // appear on a fresh context. Dismiss both so the rest of the run is unaffected.
+  const introSkip = page.locator('[data-testid="studio-intro-skip"]');
+  r.introSeen = await introSkip.isVisible().catch(() => false);
+  if (r.introSeen) await introSkip.click().catch(() => {});
+  await page.waitForTimeout(500);
+  const tour = page.locator('[data-testid="studio-tour"]');
+  r.tourSeen = await tour.isVisible().catch(() => false);
+  if (r.tourSeen) await page.locator('[data-testid="studio-tour-done"]').click().catch(() => {});
+  await page.waitForTimeout(350);
+
   // Exactly one top menu bar (guards against the duplicate-bar regression).
   r.fileMenuCount = await page.getByRole("button", { name: "File", exact: true }).count();
   r.promptBarVisible = await page.getByText(/Try:/).first().isVisible().catch(() => false);
@@ -73,6 +84,7 @@ async function run(width, height, label) {
 
   r.pass =
     r.studioReady &&
+    (r.introSeen || r.tourSeen) &&
     r.fileMenuCount === 1 &&
     r.promptBarVisible &&
     r.titleApplied &&
