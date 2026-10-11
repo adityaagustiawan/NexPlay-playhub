@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import DevCoins from "./pages/DevCoins";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import Studio from "./pages/Studio";
