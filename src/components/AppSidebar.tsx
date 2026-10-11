@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { UserFooter } from "@/components/UserFooter";
-import { BetaBadge } from "@/components/BetaBadge";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
