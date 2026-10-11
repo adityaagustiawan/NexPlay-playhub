@@ -1,7 +1,6 @@
 import { Search, Bell, Users, MessageSquare, Menu, Gamepad2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
-import { BetaBadge } from "@/components/BetaBadge";
 
 interface TopBarProps {
   onMenuToggle?: () => void;
