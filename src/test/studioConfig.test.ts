@@ -38,6 +38,11 @@ describe("buildGameplay", () => {
     expect(buildGameplay({ ...DEFAULT_CONFIG, mode: "catch" }).genre).toBe("Catch 'em up");
     expect(buildGameplay({ ...DEFAULT_CONFIG, mode: "runner" }).genre).toBe("Endless Runner");
   });
+
+  it("carries the 2D/3D dimension through", () => {
+    expect(buildGameplay(DEFAULT_CONFIG).dimension).toBe("2d");
+    expect(buildGameplay({ ...DEFAULT_CONFIG, dimension: "3d" }).dimension).toBe("3d");
+  });
 });
 
 describe("clampNumber", () => {
