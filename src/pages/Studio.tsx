@@ -25,11 +25,13 @@ import {
   type StudioConfig,
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
-import { Viewport3D } from "@/components/studio/Viewport3D";
+import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
 import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
+import { OperatorSearch, type StudioOperator } from "@/components/studio/OperatorSearch";
+import { useBlenderInput } from "@/hooks/useBlenderInput";
 import {
   AlertTriangle,
   Box,
@@ -46,6 +48,7 @@ import {
   MousePointer2,
   PanelRight,
   PenTool,
+  Play,
   Plus,
   RotateCw,
   Ruler,
