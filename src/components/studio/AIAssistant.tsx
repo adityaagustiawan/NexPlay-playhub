@@ -1,236 +1,36 @@
-// AIAssistant.tsx — "Muse", the AI panel for NexPlay Studio.
+// AIAssistant.tsx — "Muse", the AI side panel for NexPlay Studio.
 //
-// Inspired by BlenderGPT and the Free-Gpt Blender addon: describe what you want
-// and the assistant builds it into the game. It can run fully offline (a
-// rule-based planner, no key, no network), or talk to any OpenAI-compatible
-// endpoint — including free/keyless providers and a local CLI bridge (Ollama /
-// LM Studio / g4f). When it acts, the studio shows what Muse is doing.
+// Presentational: all of the conversation state lives in `useMuse` so the side
+// panel and the viewport prompt bar share one conversation. Inspired by
+// BlenderGPT and the Free-Gpt Blender addon.
 import { useEffect, useRef, useState } from "react";
 import { Bot, Check, Loader2, Send, Settings2, Sparkles, Trash2, Wrench } from "lucide-react";
-import { PROVIDERS, defaultAIConfig, findProvider, type AIConfig, type AIPlugin } from "@/lib/aiProviders";
-import { diffConfig, mergeConfig, museSystemPrompt, parseModelConfig, planGame, type MuseAction } from "@/lib/musePlan";
-import type { StudioConfig } from "@/lib/studioConfig";
-
-export interface AIMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
+import { PROVIDERS, findProvider, type AIPlugin } from "@/lib/aiProviders";
+import { MUSE_MODES, type MuseController } from "@/hooks/useMuse";
 
 interface Props {
-  config: StudioConfig;
-  /** Called with a fully-formed next config when Muse builds or edits the game. */
-  onApplyConfig?: (next: StudioConfig, actions: MuseAction[]) => void;
-  /** Called while Muse is working (a label) and with null when it is done. */
-  onActivity?: (label: string | null) => void;
+  muse: MuseController;
 }
 
-type MuseMode = "build" | "object" | "edit" | "chat";
-
-const MODES: { id: MuseMode; label: string; placeholder: string }[] = [
-  { id: "build", label: "Build", placeholder: "Describe a whole game… e.g. 'a hard 3D space shooter'" },
-  { id: "object", label: "Object", placeholder: "Add an object… e.g. 'add a giant red enemy'" },
-  { id: "edit", label: "Edit", placeholder: "What should change? e.g. 'make it faster, 3 levels'" },
-  { id: "chat", label: "Chat", placeholder: "Ask about NexPlay or your game…" },
-];
-
-const CFG_KEY = "nexstudio_ai_cfg";
-
-function loadCfg(): AIConfig {
-  try {
-    const raw = localStorage.getItem(CFG_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<AIConfig>;
-      if (p && typeof p.providerId === "string") return { ...defaultAIConfig(), ...p };
-    }
-  } catch {
-    /* ignore */
-  }
-  return defaultAIConfig();
-}
-
-function modeGreeting(mode: MuseMode): string {
-  switch (mode) {
-    case "build":
-      return "Tell me the game you want and I'll build it — mode, dimension, theme, difficulty, all of it. Try “a chill ocean runner” or “a brutal 3D shooter”.";
-    case "object":
-      return "Tell me what to add and I'll place it in the scene (player, collectibles, hazards, colours).";
-    case "edit":
-      return "Tell me what to change — speed, levels, difficulty, theme, names.";
-    default:
-      return "Ask me anything about NexPlay Studio or your game.";
-  }
-}
-
-function actionSummary(rationale: string, actions: MuseAction[]): string {
-  const lines = actions.map((a) => `- ${a.label}`).join("\n");
-  return `**${rationale}**\n\n**Tools used**\n${lines || "- (no changes)"}`;
-}
-
-export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
-  const [messages, setMessages] = useState<AIMessage[]>([{ role: "assistant", content: modeGreeting("build") }]);
+export function AIAssistant({ muse }: Props) {
+  const { messages, loading, actions, mode, setMode, ai, setAi, offline, send, clear, chooseProvider, choosePlugin } = muse;
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<MuseMode>("build");
-  const [ai, setAi] = useState<AIConfig>(loadCfg);
   const [showSettings, setShowSettings] = useState(false);
-  const [actions, setActions] = useState<MuseAction[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, actions]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CFG_KEY, JSON.stringify(ai));
-    } catch {
-      /* ignore */
-    }
-  }, [ai]);
-
   const provider = findProvider(ai.providerId);
-  const offline = ai.plugin === "offline" || !ai.base || ai.model === "muse-local";
+  const keyStatus = ai.key ? "key set" : offline ? "no key needed" : "no key";
 
-  const chooseProvider = (id: string) => {
-    const p = findProvider(id);
-    setAi((a) => ({
-      ...a,
-      providerId: id,
-      base: p.base || a.base,
-      model: p.models[0] ?? a.model,
-      plugin: id === "offline" ? "offline" : a.plugin === "offline" ? "api" : a.plugin,
-    }));
-  };
-
-  const choosePlugin = (plugin: AIPlugin) => {
-    setAi((a) => {
-      if (plugin === "offline") return { ...a, plugin };
-      if (plugin === "cli" && !findProvider(a.providerId).local) {
-        const p = findProvider("ollama");
-        return { ...a, plugin, providerId: p.id, base: p.base, model: p.models[0] };
-      }
-      const p = findProvider(a.providerId);
-      if (p.id === "offline") {
-        const fallback = findProvider("pollinations");
-        return { ...a, plugin, providerId: fallback.id, base: fallback.base, model: fallback.models[0] };
-      }
-      return { ...a, plugin };
-    });
-  };
-
-  const send = async () => {
+  const submit = () => {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
-    setActions([]);
-    setMessages((m) => [...m, { role: "user", content: text }]);
-    setLoading(true);
-    const building = mode !== "chat";
-
-    try {
-      if (offline) {
-        if (!building) {
-          setMessages((m) => [...m, { role: "assistant", content: offlineChat(text, config) }]);
-          return;
-        }
-        onActivity?.("Muse is creating…");
-        // Give the overlay a beat so the studio visibly shows the AI working.
-        await new Promise((r) => setTimeout(r, 420));
-        const plan = planGame(text, config);
-        // "Object" mode only places/renames things; "Build"/"Edit" retune the game.
-        const next: StudioConfig =
-          mode === "object"
-            ? {
-                ...config,
-                dimension: plan.config.dimension,
-                theme: plan.config.theme,
-                names: plan.config.names,
-                description: plan.config.description,
-              }
-            : plan.config;
-        const acts = diffConfig(config, next);
-        onApplyConfig?.(next, acts);
-        setActions(acts);
-        setMessages((m) => [...m, { role: "assistant", content: actionSummary(plan.rationale, acts) }]);
-        onActivity?.(null);
-        return;
-      }
-
-      // Real provider (API or local CLI bridge).
-      onActivity?.("Muse is thinking…");
-      const sys = building ? museSystemPrompt(config) : "You are a helpful assistant inside NexPlay Studio, a Blender-style 2D/3D game editor. Reply concisely in markdown.";
-      const res = await fetch(`${ai.base.replace(/\/+$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(ai.key ? { Authorization: `Bearer ${ai.key}` } : {}),
-        },
-        body: JSON.stringify({
-          model: ai.model,
-          messages: [
-            { role: "system", content: sys },
-            ...messages.slice(-8).filter((m) => m.role !== "system"),
-            { role: "user", content: text },
-          ],
-          temperature: building ? 0.6 : 0.7,
-          max_tokens: 1200,
-        }),
-      });
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      const data = await res.json();
-      const content: string = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? "";
-
-      if (!building) {
-        setMessages((m) => [...m, { role: "assistant", content: content || "(empty response)" }]);
-        onActivity?.(null);
-        return;
-      }
-
-      onActivity?.("Muse is building…");
-      const parsed = parseModelConfig(content);
-      if (parsed) {
-        const next = mergeConfig(config, parsed.config);
-        const acts = diffConfig(config, next);
-        onApplyConfig?.(next, acts);
-        setActions(acts);
-        setMessages((m) => [
-          ...m,
-          { role: "assistant", content: actionSummary(parsed.rationale || "Applied your changes.", acts) },
-        ]);
-      } else {
-        setMessages((m) => [
-          ...m,
-          { role: "assistant", content: content || "I couldn't turn that into a game — try describing it differently." },
-        ]);
-      }
-      onActivity?.(null);
-    } catch (err) {
-      onActivity?.(null);
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: `⚠ ${err instanceof Error ? err.message : "Request failed"}. Muse's offline mode works with no key — switch Plugins to “Offline”, or set an endpoint in Settings.`,
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    void send(text);
   };
-
-  const clearChat = () => {
-    setMessages([{ role: "assistant", content: modeGreeting(mode) }]);
-    setActions([]);
-    onActivity?.(null);
-  };
-
-  const switchMode = (m: MuseMode) => {
-    setMode(m);
-    setMessages([{ role: "assistant", content: modeGreeting(m) }]);
-    setActions([]);
-  };
-
-  const keyStatus = ai.key ? "key set" : offline ? "no key needed" : "no key";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#282828] text-[11px] text-[#d0d0d0]">
@@ -244,7 +44,7 @@ export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
           <button type="button" title="Settings" onClick={() => setShowSettings((s) => !s)} className={`rounded-[3px] p-1 hover:bg-[#3a3a3a] ${showSettings ? "text-white" : "text-[#b0b0b0]"}`}>
             <Settings2 className="h-3 w-3" />
           </button>
-          <button type="button" title="Clear chat" onClick={clearChat} className="rounded-[3px] p-1 text-[#b0b0b0] hover:bg-[#3a3a3a]">
+          <button type="button" title="Clear chat" onClick={clear} className="rounded-[3px] p-1 text-[#b0b0b0] hover:bg-[#3a3a3a]">
             <Trash2 className="h-3 w-3" />
           </button>
         </div>
@@ -252,11 +52,11 @@ export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
 
       {/* Mode tabs */}
       <div className="flex shrink-0 items-center gap-1 border-b border-[#1d1d1d] bg-[#2b2b2b] px-2 py-1">
-        {MODES.map((m) => (
+        {MUSE_MODES.map((m) => (
           <button
             key={m.id}
             type="button"
-            onClick={() => switchMode(m.id)}
+            onClick={() => setMode(m.id)}
             className={`rounded-[3px] px-2 py-0.5 text-[10px] uppercase tracking-wide ${
               mode === m.id ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"
             }`}
@@ -404,16 +204,16 @@ export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              void send();
+              submit();
             }
           }}
-          placeholder={MODES.find((m) => m.id === mode)?.placeholder}
+          placeholder={MUSE_MODES.find((m) => m.id === mode)?.placeholder}
           disabled={loading}
           className="h-7 flex-1 rounded-[3px] border border-[#4a4a4a] bg-[#1d1d1d] px-2 text-[11px] outline-none focus:border-[#4772b3] disabled:opacity-50"
         />
         <button
           type="button"
-          onClick={() => void send()}
+          onClick={submit}
           disabled={loading || !input.trim()}
           title="Send to Muse"
           className="flex h-7 w-7 items-center justify-center rounded-[3px] bg-[#4772b3] text-white hover:bg-[#5a85c6] disabled:opacity-50"
@@ -423,17 +223,4 @@ export function AIAssistant({ config, onApplyConfig, onActivity }: Props) {
       </div>
     </div>
   );
-}
-
-// Local helpers -------------------------------------------------------------
-
-function offlineChat(text: string, config: StudioConfig): string {
-  const t = text.toLowerCase();
-  if (/key|api|model|provider|plugin/.test(t)) {
-    return "Set a provider under **Model → Plugin**, or use **Offline** (no key). Free keyless option: Pollinations. Local option: run Ollama/LM Studio and use the **CLI** plugin.";
-  }
-  if (/dimension|2d|3d/.test(t)) {
-    return `This game is currently **${config.dimension.toUpperCase()}**. Switch it in the viewport header, or tell me “make it 3D” in Build mode.`;
-  }
-  return `I'm running in **offline** mode (rule-based). I can build or edit games from a description. This game is a ${config.difficulty} ${config.dimension.toUpperCase()} ${config.mode} titled “${config.title}”. For free-form chat, pick a real model under Model → Plugin.`;
 }
