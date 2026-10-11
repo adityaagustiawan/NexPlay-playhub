@@ -4,11 +4,14 @@
 
 export type Mode = "catch" | "shooter" | "runner";
 export type Difficulty = "easy" | "medium" | "hard";
+/** A game is either a 2D canvas game or a 3D world; the editor viewport follows this. */
+export type Dimension = "2d" | "3d";
 
 export interface StudioConfig {
   title: string;
   description: string;
   mode: Mode;
+  dimension: Dimension;
   difficulty: Difficulty;
   levels: number;
   goal: number;
@@ -22,6 +25,7 @@ export const DEFAULT_CONFIG: StudioConfig = {
   title: "Untitled Game",
   description: "Built in Nexstudio.",
   mode: "catch",
+  dimension: "2d",
   difficulty: "medium",
   levels: 5,
   goal: 15,
@@ -76,6 +80,7 @@ const GENRE: Record<Mode, string> = {
 export function buildGameplay(c: StudioConfig): Record<string, unknown> {
   return {
     mode: c.mode,
+    dimension: c.dimension,
     genre: GENRE[c.mode],
     difficulty: c.difficulty,
     levels: c.levels,
