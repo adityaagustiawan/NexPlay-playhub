@@ -1,16 +1,14 @@
-// Studio.tsx — "Nexstudio", a Roblox-Studio-style visual editor for NEXCONSOLE
-// games. Edit a game's gameplay config (mode, difficulty, tuning, theme, names)
-// with a live playable viewport, then Save (draft) or Publish/Update it back to
+// Studio.tsx — "Nexstudio". A Blender-inspired, taskbar-first web editor for
+// NEXCONSOLE games: the game runs fullscreen with just a top menu bar
+// (File / Edit / View / Game / Recent / Help). File ▸ Open reopens any game you
+// previously made or updated and keeps editing it; Save / Publish write back to
 // the same Supabase row so the NexConsole app shows the change.
-//
-// Layout: Explorer (left) · Viewport (centre) · Inspector (right).
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { asJson } from "@/lib/supabaseJson";
-import { loadGameRecord, type GameRecord } from "@/engine/gameLoader";
-import type { GamePackage } from "@/engine/gameLoader";
+import { loadGameRecord, type GameRecord, type GamePackage } from "@/engine/gameLoader";
 import {
   DEFAULT_CONFIG,
   GOOD_LABEL,
@@ -23,6 +21,8 @@ import {
   type StudioConfig,
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
+import { MenuBar, type MenuDef } from "@/components/studio/MenuBar";
+import { OpenGameDialog, loadMyGames, type GameSummary } from "@/components/studio/OpenGameDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,8 +38,6 @@ import {
   Gamepad2,
   Save,
   Upload,
-  ExternalLink,
-  ArrowLeft,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -50,6 +48,9 @@ import {
   Palette,
   Gauge,
   LayoutGrid,
+  PanelLeft,
+  PanelRight,
+  LogOut,
 } from "lucide-react";
 
 type SelKey = "game" | "player" | "good" | "bad" | "environment" | "performance";
@@ -97,6 +98,7 @@ const Studio = () => {
   const [params, setParams] = useSearchParams();
   const gameKeyParam = params.get("game");
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<StudioConfig>(DEFAULT_CONFIG);
   const [record, setRecord] = useState<GameRecord | null>(null);
   const [loading, setLoading] = useState(Boolean(gameKeyParam));
@@ -105,6 +107,12 @@ const Studio = () => {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelKey>("game");
   const [nonce, setNonce] = useState(0);
+  // Panels start closed so the editor is fullscreen with only the taskbar.
+  const [showExplorer, setShowExplorer] = useState(false);
+  const [showProperties, setShowProperties] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [myGames, setMyGames] = useState<GameSummary[]>([]);
+  const [gamesLoading, setGamesLoading] = useState(false);
 
   // Load an existing game when ?game=<game_key> is present.
   useEffect(() => {
@@ -124,22 +132,24 @@ const Studio = () => {
         setLoading(false);
         return;
       }
-      const gp = rec.gameplay as Record<string, any>;
+      const gp = rec.gameplay as Record<string, unknown>;
       setRecord(rec);
       setConfig({
         ...DEFAULT_CONFIG,
         title: rec.title ?? DEFAULT_CONFIG.title,
         description: rec.description ?? DEFAULT_CONFIG.description,
-        mode: ["catch", "shooter", "runner"].includes(gp?.mode) ? gp.mode : DEFAULT_CONFIG.mode,
-        difficulty: ["easy", "medium", "hard"].includes(gp?.difficulty)
-          ? gp.difficulty
+        mode: ["catch", "shooter", "runner"].includes(gp?.mode as string)
+          ? (gp.mode as Mode)
+          : DEFAULT_CONFIG.mode,
+        difficulty: ["easy", "medium", "hard"].includes(gp?.difficulty as string)
+          ? (gp.difficulty as Difficulty)
           : DEFAULT_CONFIG.difficulty,
         levels: Number(gp?.levels) || DEFAULT_CONFIG.levels,
         goal: Number(gp?.goal) || DEFAULT_CONFIG.goal,
         speed: Number(gp?.speed) || DEFAULT_CONFIG.speed,
         spawnMs: Number(gp?.spawnMs) || DEFAULT_CONFIG.spawnMs,
-        theme: { ...DEFAULT_CONFIG.theme, ...(gp?.theme ?? {}) },
-        names: { ...DEFAULT_CONFIG.names, ...(gp?.names ?? {}) },
+        theme: { ...DEFAULT_CONFIG.theme, ...((gp?.theme as object) ?? {}) },
+        names: { ...DEFAULT_CONFIG.names, ...((gp?.names as object) ?? {}) },
       });
       setLoading(false);
     })();
@@ -147,6 +157,21 @@ const Studio = () => {
       alive = false;
     };
   }, [gameKeyParam]);
+
+  const refreshMyGames = useCallback(async () => {
+    if (!user) {
+      setMyGames([]);
+      return;
+    }
+    setGamesLoading(true);
+    const list = await loadMyGames(user.id);
+    setMyGames(list);
+    setGamesLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    refreshMyGames();
+  }, [refreshMyGames]);
 
   const pkg: GamePackage = useMemo(
     () => ({
@@ -162,7 +187,7 @@ const Studio = () => {
   const setNames = (k: keyof StudioConfig["names"], v: string) =>
     setConfig((c) => ({ ...c, names: { ...c.names, [k]: v } }));
 
-  const persist = async (publish: boolean) => {
+  const persist = async (publish: boolean, opts?: { asNew?: boolean; title?: string }) => {
     setNotice(null);
     setError(null);
     if (!user) {
@@ -171,18 +196,19 @@ const Studio = () => {
     }
     setBusy(true);
     try {
+      const title = opts?.title ?? config.title;
       const gameplay = buildGameplay(config);
       const assets = { palette: "custom", generatedBy: "nexstudio", prompt: config.description };
       const studioData = { source: "nexstudio", editedAt: new Date().toISOString() };
 
-      if (record) {
+      if (record && !opts?.asNew) {
         const alreadyReleased = Boolean(record.released_at);
         const releasedAt = publish && !alreadyReleased ? new Date().toISOString() : record.released_at;
         const nextVersion = publish
           ? Math.max(1, (record.version ?? 1) + (alreadyReleased ? 1 : 0))
           : record.version;
         const update = {
-          title: config.title,
+          title,
           description: config.description,
           gameplay: asJson(gameplay),
           assets: asJson(assets),
@@ -197,7 +223,7 @@ const Studio = () => {
         if (updErr) throw new Error(updErr.message);
         setRecord({
           ...record,
-          title: config.title,
+          title,
           description: config.description,
           gameplay,
           assets,
@@ -205,6 +231,7 @@ const Studio = () => {
           status: publish && !alreadyReleased ? "pending" : record.status,
           version: nextVersion,
         });
+        setConfig((c) => ({ ...c, title }));
         setNonce((n) => n + 1);
         setNotice(
           publish
@@ -214,13 +241,13 @@ const Studio = () => {
             : "Draft saved.",
         );
       } else {
-        const gameKey = `${slugify(config.title)}-${Date.now().toString(36)}`;
+        const gameKey = `${slugify(title)}-${Date.now().toString(36)}`;
         const { data, error: insErr } = await supabase
           .from("games")
           .insert({
             user_id: user.id,
             game_key: gameKey,
-            title: config.title,
+            title,
             description: config.description,
             gameplay: asJson(gameplay),
             assets: asJson(assets),
@@ -237,10 +264,12 @@ const Studio = () => {
           .single();
         if (insErr) throw new Error(insErr.message);
         setRecord(data as GameRecord);
+        setConfig((c) => ({ ...c, title }));
         setParams({ game: gameKey }, { replace: true });
         setNonce((n) => n + 1);
-        setNotice("Saved. Press Publish to submit it for review.");
+        setNotice("Saved. Use File ▸ Publish to submit it for review.");
       }
+      refreshMyGames();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save.");
     } finally {
@@ -248,8 +277,157 @@ const Studio = () => {
     }
   };
 
+  const newGame = () => {
+    setParams({}, { replace: true });
+    setRecord(null);
+    setConfig(DEFAULT_CONFIG);
+    setSelected("game");
+    setError(null);
+    setNotice("New game — edit it, then Save.");
+  };
+
+  const toggleFullscreen = () => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen?.();
+  };
+
+  const openGame = (g: GameSummary) => {
+    setOpenDialog(false);
+    setParams({ game: g.game_key });
+  };
+
   // Only the owner may save/publish; everyone else gets a read-only editor.
   const isOwner = !record || (!!user && user.id === record.user_id);
+
+  // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "s") {
+        e.preventDefault();
+        persist(e.shiftKey);
+      } else if (k === "o") {
+        e.preventDefault();
+        refreshMyGames();
+        setOpenDialog(true);
+      } else if (k === "n") {
+        e.preventDefault();
+        newGame();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, record, busy, isOwner, user]);
+
+  const menus: MenuDef[] = useMemo(
+    () => [
+      {
+        label: "File",
+        items: [
+          { label: "New Game", shortcut: "Ctrl+N", onSelect: newGame },
+          {
+            label: "Open Game…",
+            shortcut: "Ctrl+O",
+            onSelect: () => {
+              refreshMyGames();
+              setOpenDialog(true);
+            },
+          },
+          { separator: true },
+          {
+            label: "Save",
+            shortcut: "Ctrl+S",
+            onSelect: () => persist(false),
+            disabled: busy || !isOwner,
+          },
+          {
+            label: record?.released_at ? "Update (publish)" : "Publish",
+            shortcut: "Ctrl+Shift+S",
+            onSelect: () => persist(true),
+            disabled: busy || !isOwner,
+          },
+          { separator: true },
+          {
+            label: "Save a copy…",
+            onSelect: () => persist(false, { asNew: true, title: `${config.title} copy` }),
+            disabled: busy || !user,
+          },
+          {
+            label: "Play in new tab",
+            onSelect: record ? () => window.open(`/play/${record.game_key}`, "_blank") : undefined,
+            disabled: !record,
+          },
+          { separator: true },
+          { label: "Exit to NexConsole", onSelect: () => navigate("/create") },
+        ],
+      },
+      {
+        label: "Edit",
+        items: [
+          {
+            label: "Reset settings to defaults",
+            onSelect: () =>
+              setConfig((c) => ({ ...DEFAULT_CONFIG, title: c.title, description: c.description })),
+          },
+        ],
+      },
+      {
+        label: "View",
+        items: [
+          { label: "Explorer", checked: showExplorer, onSelect: () => setShowExplorer((v) => !v) },
+          {
+            label: "Properties",
+            checked: showProperties,
+            onSelect: () => setShowProperties((v) => !v),
+          },
+          { separator: true },
+          { label: "Fullscreen", shortcut: "F11", onSelect: toggleFullscreen },
+        ],
+      },
+      {
+        label: "Game",
+        items: [
+          { label: "Catch", checked: config.mode === "catch", onSelect: () => setConfig((c) => ({ ...c, mode: "catch" })) },
+          { label: "Shooter", checked: config.mode === "shooter", onSelect: () => setConfig((c) => ({ ...c, mode: "shooter" })) },
+          { label: "Runner", checked: config.mode === "runner", onSelect: () => setConfig((c) => ({ ...c, mode: "runner" })) },
+          { separator: true },
+          { label: "Easy", checked: config.difficulty === "easy", onSelect: () => setConfig((c) => ({ ...c, difficulty: "easy" })) },
+          { label: "Medium", checked: config.difficulty === "medium", onSelect: () => setConfig((c) => ({ ...c, difficulty: "medium" })) },
+          { label: "Hard", checked: config.difficulty === "hard", onSelect: () => setConfig((c) => ({ ...c, difficulty: "hard" })) },
+        ],
+      },
+      {
+        label: "Recent",
+        items:
+          myGames.length > 0
+            ? myGames
+                .slice(0, 12)
+                .map((g) => ({
+                  label: g.title || "Untitled",
+                  checked: g.game_key === gameKeyParam,
+                  onSelect: () => setParams({ game: g.game_key }),
+                }))
+            : [{ label: "No games yet", disabled: true }],
+      },
+      {
+        label: "Help",
+        items: [
+          {
+            label: "About Nexstudio",
+            onSelect: () =>
+              setNotice("Nexstudio — taskbar-first game editor. File ▸ Open to edit a previous game."),
+          },
+          { label: "Move ← → / WASD · Space = shoot/jump", disabled: true },
+        ],
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config, record, busy, isOwner, user, myGames, gameKeyParam, showExplorer, showProperties],
+  );
 
   // ---- Inspector groups ----
   const inspector = () => {
@@ -274,10 +452,7 @@ const Studio = () => {
             </div>
             <div className="space-y-1.5">
               <Label className="font-body text-xs text-muted-foreground">Mode</Label>
-              <Select
-                value={config.mode}
-                onValueChange={(v) => setConfig((c) => ({ ...c, mode: v as Mode }))}
-              >
+              <Select value={config.mode} onValueChange={(v) => setConfig((c) => ({ ...c, mode: v as Mode }))}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -311,10 +486,7 @@ const Studio = () => {
                   type="number"
                   value={config.levels}
                   onChange={(e) =>
-                    setConfig((c) => ({
-                      ...c,
-                      levels: clampNumber(e.target.value, 1, 10, c.levels),
-                    }))
+                    setConfig((c) => ({ ...c, levels: clampNumber(e.target.value, 1, 10, c.levels) }))
                   }
                 />
               </div>
@@ -336,16 +508,9 @@ const Studio = () => {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="font-body text-xs text-muted-foreground">Player name</Label>
-              <Input
-                value={config.names.player}
-                onChange={(e) => setNames("player", e.target.value)}
-              />
+              <Input value={config.names.player} onChange={(e) => setNames("player", e.target.value)} />
             </div>
-            <ColorField
-              label="Player color"
-              value={config.theme.player}
-              onChange={(v) => setTheme("player", v)}
-            />
+            <ColorField label="Player color" value={config.theme.player} onChange={(v) => setTheme("player", v)} />
           </div>
         );
       case "good":
@@ -424,7 +589,7 @@ const Studio = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !record) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -433,54 +598,74 @@ const Studio = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground">
-      {/* Toolbar */}
-      <header className="h-14 shrink-0 flex items-center gap-3 px-3 md:px-4 border-b border-border bg-sidebar">
-        <Link
-          to="/create"
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0"
-          title="Back to NexConsole"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div className="flex items-center gap-2 shrink-0">
-          <Gamepad2 className="h-5 w-5 text-primary" />
-          <span className="font-heading text-sm font-bold">
-            NEX<span className="text-primary">STUDIO</span>
-          </span>
-        </div>
-        <div className="hidden sm:block flex-1 min-w-0">
-          <Input
-            value={config.title}
-            onChange={(e) => setConfig((c) => ({ ...c, title: e.target.value }))}
-            className="h-8 max-w-xs bg-background"
-          />
-        </div>
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          {record && (
+    <div ref={rootRef} className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      <MenuBar
+        menus={menus}
+        brand={
+          <>
+            <Gamepad2 className="h-4 w-4 text-primary" />
+            <span className="font-heading text-xs font-bold tracking-wide">
+              NEX<span className="text-primary">STUDIO</span>
+            </span>
+            <input
+              value={config.title}
+              onChange={(e) => setConfig((c) => ({ ...c, title: e.target.value }))}
+              aria-label="Game title"
+              className="h-6 w-40 rounded border border-transparent bg-transparent px-1.5 text-xs font-body text-foreground hover:border-border focus:border-border focus:outline-none"
+            />
+          </>
+        }
+        right={
+          <>
+            <button
+              type="button"
+              title="Toggle Explorer"
+              onClick={() => setShowExplorer((v) => !v)}
+              className={`h-7 w-7 flex items-center justify-center rounded ${
+                showExplorer ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/60"
+              }`}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Toggle Properties"
+              onClick={() => setShowProperties((v) => !v)}
+              className={`h-7 w-7 flex items-center justify-center rounded ${
+                showProperties ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/60"
+              }`}
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => window.open(`/play/${record.game_key}`, "_blank")}
+              className="h-7 px-2"
+              onClick={() => persist(false)}
+              disabled={busy || !isOwner}
             >
-              <ExternalLink className="h-4 w-4 mr-1" /> Play
+              {busy ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+              Save
             </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => persist(false)} disabled={busy || !isOwner}>
-            {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-            Save
-          </Button>
-          <Button size="sm" onClick={() => persist(true)} disabled={busy || !isOwner}>
-            <Upload className="h-4 w-4 mr-1" />
-            {record?.released_at ? "Update" : "Publish"}
-          </Button>
-        </div>
-      </header>
+            <Button size="sm" className="h-7 px-2" onClick={() => persist(true)} disabled={busy || !isOwner}>
+              <Upload className="h-3.5 w-3.5 mr-1" />
+              {record?.released_at ? "Update" : "Publish"}
+            </Button>
+            <button
+              type="button"
+              title="Exit to NexConsole"
+              onClick={() => navigate("/create")}
+              className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-secondary/60"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </>
+        }
+      />
 
-      {/* Status bar */}
       {(notice || error) && (
         <div
-          className={`px-4 py-2 text-xs font-body flex items-center gap-2 shrink-0 ${
+          className={`px-4 py-1.5 text-xs font-body flex items-center gap-2 shrink-0 ${
             error ? "bg-destructive/15 text-destructive" : "bg-emerald-500/15 text-emerald-500"
           }`}
         >
@@ -489,71 +674,84 @@ const Studio = () => {
         </div>
       )}
 
-      {/* Workspace */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[220px_1fr_300px] overflow-hidden">
-        {/* Explorer */}
-        <aside className="hidden lg:flex flex-col border-r border-border bg-sidebar/50 overflow-y-auto">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-heading border-b border-border flex items-center gap-2">
-            <LayoutGrid className="h-3.5 w-3.5" /> Explorer
-          </div>
-          <nav className="p-2 space-y-0.5">
-            {EXPLORER.map((item) => {
-              const Icon = item.icon;
-              const label =
-                item.key === "good"
-                  ? GOOD_LABEL[config.mode]
-                  : item.key === "bad"
-                    ? BAD_LABEL[config.mode]
-                    : item.label;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setSelected(item.key)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm font-body text-left transition-colors ${
-                    selected === item.key
-                      ? "bg-primary/20 text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {label}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
+      {/* Fullscreen workspace */}
+      <div className="relative flex-1 min-h-0 flex">
+        {showExplorer && (
+          <aside className="w-56 shrink-0 flex flex-col border-r border-border bg-sidebar/60 overflow-y-auto">
+            <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-heading border-b border-border flex items-center gap-2">
+              <LayoutGrid className="h-3.5 w-3.5" /> Explorer
+            </div>
+            <nav className="p-2 space-y-0.5">
+              {EXPLORER.map((item) => {
+                const Icon = item.icon;
+                const label =
+                  item.key === "good"
+                    ? GOOD_LABEL[config.mode]
+                    : item.key === "bad"
+                      ? BAD_LABEL[config.mode]
+                      : item.label;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setSelected(item.key)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm font-body text-left transition-colors ${
+                      selected === item.key
+                        ? "bg-primary/20 text-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+        )}
 
-        {/* Viewport */}
-        <main className="relative overflow-auto bg-[repeating-conic-gradient(#0000_0%_25%,#00000022_0%_50%)] bg-[length:24px_24px] p-4">
-          <div className="max-w-3xl mx-auto">
-            <GamePreview
-              pkg={pkg}
-              title={config.title || "Untitled"}
-              onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined}
-            />
-          </div>
+        <main className="relative flex-1 min-h-0 bg-black">
+          <GamePreview
+            key={nonce}
+            fill
+            pkg={pkg}
+            title={config.title || "Untitled"}
+            onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined}
+          />
         </main>
 
-        {/* Inspector */}
-        <aside className="border-l border-border bg-sidebar/50 overflow-y-auto">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-heading border-b border-border">
-            Properties — {EXPLORER.find((e) => e.key === selected)?.label}
-          </div>
-          <div className="p-4">{inspector()}</div>
-        </aside>
+        {showProperties && (
+          <aside className="w-72 shrink-0 border-l border-border bg-sidebar/60 overflow-y-auto">
+            <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-heading border-b border-border">
+              Properties — {EXPLORER.find((e) => e.key === selected)?.label}
+            </div>
+            <div className="p-4">{inspector()}</div>
+          </aside>
+        )}
       </div>
 
       {!user && (
-        <div className="px-4 py-2 bg-yellow-500/15 text-yellow-600 text-xs font-body">
-          You're not signed in — <Link to="/login" className="underline">sign in</Link> to save or
-          publish.
+        <div className="px-4 py-1.5 bg-yellow-500/15 text-yellow-600 text-xs font-body">
+          You're not signed in — <Link to="/login" className="underline">sign in</Link> to save or publish.
         </div>
       )}
       {user && record && !isOwner && (
-        <div className="px-4 py-2 bg-yellow-500/15 text-yellow-600 text-xs font-body">
+        <div className="px-4 py-1.5 bg-yellow-500/15 text-yellow-600 text-xs font-body">
           Read-only — you can only edit games you created.
         </div>
       )}
+
+      <OpenGameDialog
+        open={openDialog}
+        games={myGames}
+        loading={gamesLoading}
+        currentKey={gameKeyParam}
+        onClose={() => setOpenDialog(false)}
+        onOpen={openGame}
+        onNew={() => {
+          setOpenDialog(false);
+          newGame();
+        }}
+      />
     </div>
   );
 };
