@@ -2,6 +2,7 @@
 // Game package shape: { gameplay, assets, scripts? }
 
 import { supabase } from "@/integrations/supabase/client";
+import { asRecord } from "@/lib/supabaseJson";
 
 export interface GamePackage {
   gameplay: Record<string, unknown>;
