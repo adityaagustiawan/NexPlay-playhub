@@ -715,7 +715,8 @@ const Creator = () => {
                 Earn from Your Games
               </h3>
               <p className="font-body text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Monetize your games with in-game purchases, ads, and premium features.
+                Sell items inside your games for NexCoins. Every NexCoin a player spends is
+                credited to you as a DevCoin — cash out at 50 DevCoins = $0.99.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
                 <div className="bg-secondary rounded-lg p-4">
@@ -731,11 +732,36 @@ const Creator = () => {
                   <p className="font-body text-xs text-muted-foreground">Live Games</p>
                 </div>
                 <div className="bg-secondary rounded-lg p-4">
-                  <p className="font-heading text-xl font-bold text-foreground">$0</p>
-                  <p className="font-body text-xs text-muted-foreground">Revenue</p>
+                  <p className="font-heading text-xl font-bold text-foreground tabular-nums">
+                    {devcoinsToUsd(totalDevcoins)}
+                  </p>
+                  <p className="font-body text-xs text-muted-foreground">Revenue cashable</p>
                 </div>
               </div>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Button size="sm" onClick={() => navigate("/devcoins")}>
+                  <Wallet className="h-3.5 w-3.5 mr-1" /> DevCoin wallet
+                </Button>
+                <span className="font-body text-xs text-muted-foreground tabular-nums">
+                  {formatDevcoins(totalDevcoins)} DevCoins earned
+                </span>
+              </div>
             </div>
+
+            {user && (
+              <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4 text-primary" />
+                  <h3 className="font-heading text-sm font-bold text-foreground">
+                    Items for sale
+                  </h3>
+                </div>
+                <ItemStoreEditor
+                  creatorId={user.id}
+                  games={myGames.map((game) => ({ id: game.id, title: game.title }))}
+                />
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
