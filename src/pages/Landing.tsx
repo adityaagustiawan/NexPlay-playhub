@@ -1,5 +1,4 @@
 import { NavLink } from "@/components/NavLink";
-import { BetaBadge } from "@/components/BetaBadge";
 import { PromptDemo } from "@/components/PromptDemo";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -59,7 +58,6 @@ const Landing = () => {
           <span className="font-heading text-lg font-bold">
             <span className="text-primary">NEX</span>CONSOLE
           </span>
-          <BetaBadge className="ml-1" />
         </NavLink>
 
         <div className="ml-auto flex items-center gap-3">
@@ -100,7 +98,6 @@ const Landing = () => {
 
         <div className="relative max-w-3xl mx-auto text-center">
           <div className="rise-in flex items-center justify-center gap-3 mb-6">
-            <BetaBadge className="!text-[11px] !px-3 !py-1" />
             <span className="font-body text-xs text-muted-foreground">
               Public testing — help us shape it
             </span>
@@ -217,7 +214,6 @@ const Landing = () => {
         <div className="max-w-4xl mx-auto bg-gradient-to-br from-primary/25 via-card to-card border border-border rounded-2xl p-8 md:p-12 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Users className="h-5 w-5 text-primary" />
-            <BetaBadge />
           </div>
           <h2 className="font-heading text-2xl md:text-3xl font-bold mb-3">
             Be one of the first creators
