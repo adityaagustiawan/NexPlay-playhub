@@ -4,6 +4,7 @@
 import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
+import { ResizeGrip } from "@/components/studio/ResizeGrip";
 import { Timeline } from "@/components/studio/Timeline";
 import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
@@ -44,6 +45,10 @@ interface LayoutProps {
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
   setEditMode?: (m: string) => void;
+  panelWidth: number;
+  setPanelWidth: (n: number) => void;
+  outlinerHeight: number;
+  setOutlinerHeight: (n: number) => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -72,6 +77,10 @@ export function WorkspaceRenderer(props: LayoutProps) {
     viewportRef,
     viewportBodyRef,
     setEditMode,
+    panelWidth,
+    setPanelWidth,
+    outlinerHeight,
+    setOutlinerHeight,
   } = props;
 
   const RenderViewport = null;
