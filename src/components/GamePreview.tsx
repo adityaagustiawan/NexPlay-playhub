@@ -13,9 +13,11 @@ interface Props {
   onRendered?: () => void;
   onError?: (message: string) => void;
   onOpenFull?: () => void;
+  /** Fullscreen mode: fill the parent with just the canvas (+ floating actions). */
+  fill?: boolean;
 }
 
-export function GamePreview({ pkg, title, onRendered, onError, onOpenFull }: Props) {
+export function GamePreview({ pkg, title, onRendered, onError, onOpenFull, fill }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [nonce, setNonce] = useState(0);
 
@@ -32,6 +34,27 @@ export function GamePreview({ pkg, title, onRendered, onError, onOpenFull }: Pro
     return () => instance?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg, nonce]);
+
+  if (fill) {
+    return (
+      <div className="relative w-full h-full">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full block bg-black touch-none select-none"
+        />
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setNonce((n) => n + 1)}>
+            <RotateCcw className="h-4 w-4 mr-1" /> Replay
+          </Button>
+          {onOpenFull && (
+            <Button size="sm" onClick={onOpenFull}>
+              <Maximize2 className="h-4 w-4 mr-1" /> Full player
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
