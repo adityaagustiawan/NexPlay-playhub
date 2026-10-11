@@ -1008,7 +1008,6 @@ const Studio = () => {
             tools={TOOLS}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
-            renderViewport={() => null}
           />
         </div>
       </div>
