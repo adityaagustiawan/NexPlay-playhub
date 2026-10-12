@@ -5,8 +5,8 @@
 // on GitHub. "Add" downloads the .glb, parses it (importGlb) and hands the
 // meshes to the scene as grounded objects.
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
-import { importGlb, type ImportedMesh } from "@/lib/gltf";
+import { Download, FileDown, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
+import { downloadBlob, importGlb, type ImportedMesh } from "@/lib/gltf";
 
 interface RemoteAsset {
   id: string;
@@ -117,6 +117,23 @@ export function AssetLibrary({ onAddMesh, onImportFile }: Props) {
     [onAddMesh],
   );
 
+  /** Downloads just the raw .glb, so engines can import it directly. */
+  const downloadAsset = useCallback(async (a: { id: string; url: string; name?: string }) => {
+    setAdding((s) => ({ ...s, [a.id]: true }));
+    setFail((s) => ({ ...s, [a.id]: "" }));
+    try {
+      const res = await fetch(a.url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const slug = (a.name ?? a.id).replace(/\W+/g, "-").toLowerCase();
+      downloadBlob(new Blob([buf], { type: "model/gltf-binary" }), `${slug}.glb`);
+    } catch (e) {
+      setFail((s) => ({ ...s, [a.id]: e instanceof Error ? e.message : "Download failed" }));
+    } finally {
+      setAdding((s) => ({ ...s, [a.id]: false }));
+    }
+  }, []);
+
   const card = (a: { id: string; name: string; credit: string; license: string; url: string; thumb?: string; label?: string }) => (
     <div key={a.id} className="flex flex-col overflow-hidden rounded-[4px] border border-[#3d3d3d] bg-[#282828]">
       <div className="relative h-16 w-full bg-[#1d1d1d]">
@@ -137,15 +154,26 @@ export function AssetLibrary({ onAddMesh, onImportFile }: Props) {
         <span className="truncate text-[11px] font-medium capitalize text-[#e0e0e0]">{a.label ?? a.name}</span>
         <span className="truncate text-[9px] text-[#8f8f8f]">{a.credit}</span>
         {fail[a.id] && <span className="text-[9px] leading-tight text-[#ff8a8a]">{fail[a.id]}</span>}
-        <button
-          type="button"
-          onClick={() => addAsset(a)}
-          disabled={adding[a.id]}
-          className="mt-0.5 flex h-6 items-center justify-center gap-1 rounded-[3px] bg-[#4772b3] px-2 text-[10px] text-white hover:bg-[#5a85c6] disabled:opacity-50"
-        >
-          {adding[a.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-          {adding[a.id] ? "Adding…" : "Add to scene"}
-        </button>
+        <div className="mt-0.5 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => addAsset(a)}
+            disabled={adding[a.id]}
+            className="flex h-6 flex-1 items-center justify-center gap-1 rounded-[3px] bg-[#4772b3] px-2 text-[10px] text-white hover:bg-[#5a85c6] disabled:opacity-50"
+          >
+            {adding[a.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <PackagePlus className="h-3 w-3" />}
+            {adding[a.id] ? "Adding…" : "Add to scene"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadAsset(a)}
+            disabled={adding[a.id]}
+            title="Download the raw .glb — import it straight into Godot or Unreal 5"
+            className="flex h-6 w-7 shrink-0 items-center justify-center rounded-[3px] border border-[#4a4a4a] text-[#a0a0a0] hover:bg-[#3a3a3a] disabled:opacity-50"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -159,9 +187,11 @@ export function AssetLibrary({ onAddMesh, onImportFile }: Props) {
         </div>
         <p className="mt-1 text-[10px] leading-snug text-[#8f8f8f]">
           CC0 content from <span className="text-[#b0b0b0]">Poly Haven</span> and the{" "}
-          <span className="text-[#b0b0b0]">Khronos glTF-Sample-Models</span> repo on GitHub. Added models are
-          grounded on the studio floor; then use File ▸ Export As (GLB / OBJ / STL) to take them to Blender, Unity, or
-          a 3D printer.
+          <span className="text-[#b0b0b0]">Khronos glTF-Sample-Models</span> repo on GitHub. Add a model (or
+          drag &amp; drop any .glb/.obj file onto the viewport), then export for the engine you use:{" "}
+          <span className="text-[#b0b0b0]">Godot</span> imports GLB natively,{" "}
+          <span className="text-[#b0b0b0]">Unreal Engine</span> takes FBX (or GLB in UE5) — and every format opens
+          in Blender/Unity too.
         </p>
         <div className="mt-1.5 flex items-center gap-1">
           <button
