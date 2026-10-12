@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { AgeGate, type AgeGateResult } from "@/components/AgeGate";
 import { topUpPackages } from "@/data/gameData";
 import { useAuth } from "@/hooks/useAuth";
+<<<<<<< HEAD
 import { getDeviceHash } from "@/lib/device";
 import {
   fetchStoredVerification,
@@ -34,6 +35,10 @@ const VERIFICATION_CODES = new Set([
   "DEV_AGREEMENT_REQUIRED",
   "DEVICE_UNKNOWN",
 ]);
+=======
+import { Coins, Zap, Gift, AlertCircle, Loader2, CheckCircle2, Info, Crown } from "lucide-react";
+import { useEffect, useState } from "react";
+>>>>>>> origin/main
 
 const TopUp = () => {
   const { user, session, profile, refreshProfile } = useAuth();
@@ -41,6 +46,7 @@ const TopUp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+<<<<<<< HEAD
   // Age verification state for this device.
   const [deviceHash, setDeviceHash] = useState<string | null>(null);
   const [verification, setVerification] = useState<StoredVerification | null>(null);
@@ -48,10 +54,16 @@ const TopUp = () => {
   const [checking, setChecking] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
 
+=======
+>>>>>>> origin/main
   // Handle returning from Stripe (success or cancel).
   const params = new URLSearchParams(window.location.search);
   const justPaid = params.get("success") === "1";
   const cancelled = params.get("cancelled") === "1";
+<<<<<<< HEAD
+=======
+  const unlockPro = params.get("unlock") === "pro";
+>>>>>>> origin/main
 
   useEffect(() => {
     if (justPaid) {
@@ -62,6 +74,7 @@ const TopUp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+<<<<<<< HEAD
   // Resolve this device and load any stored agreement. If it's missing or
   // incomplete the gate opens automatically.
   useEffect(() => {
@@ -138,6 +151,10 @@ const TopUp = () => {
       setGateOpen(true);
       return;
     }
+=======
+  const handlePurchase = async () => {
+    if (!selected || loading) return;
+>>>>>>> origin/main
     setLoading(true);
     setError(null);
     try {
@@ -150,6 +167,7 @@ const TopUp = () => {
       const res = await fetch("/api/topup-checkout", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+<<<<<<< HEAD
         body: JSON.stringify({ packageId: selected, deviceHash }),
       });
       const data = await res.json().catch(() => ({}));
@@ -158,6 +176,12 @@ const TopUp = () => {
           setVerified(false);
           setGateOpen(true);
         }
+=======
+        body: JSON.stringify({ packageId: selected }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+>>>>>>> origin/main
         setError(data?.message || data?.error || `Request failed (${res.status})`);
         setLoading(false);
         return;
@@ -179,8 +203,11 @@ const TopUp = () => {
 
   return (
     <AppLayout>
+<<<<<<< HEAD
       <AgeGate open={gateOpen} onVerified={handleVerified} onClose={() => setGateOpen(false)} />
 
+=======
+>>>>>>> origin/main
       {justPaid && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-center gap-3 max-w-2xl">
           <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
@@ -197,6 +224,19 @@ const TopUp = () => {
           </p>
         </div>
       )}
+<<<<<<< HEAD
+=======
+      {unlockPro && !justPaid && (
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-6 flex items-start gap-3 max-w-2xl">
+          <Crown className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <p className="font-body text-sm text-foreground">
+            <span className="font-semibold">Unlock Pro Creator.</span> Complete any
+            top-up once and you'll get unlimited game creation in Creator Studio —
+            no subscription, no recurring charge.
+          </p>
+        </div>
+      )}
+>>>>>>> origin/main
       {error && (
         <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-6 flex items-start gap-3 max-w-2xl">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
@@ -288,6 +328,7 @@ const TopUp = () => {
 
       {/* Packages Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+<<<<<<< HEAD
         {topUpPackages.map((pkg) => {
           const allowed = !isMinor || isPackageAllowedForBracket("minor", pkg.price);
           return (
@@ -314,6 +355,33 @@ const TopUp = () => {
                 <Coins className="h-5 w-5 text-primary" />
                 <span className="font-heading text-xl font-bold text-foreground">
                   {pkg.coins.toLocaleString()}
+=======
+        {topUpPackages.map((pkg) => (
+          <button
+            key={pkg.id}
+            onClick={() => setSelected(pkg.id)}
+            disabled={loading}
+            className={`bg-card border-2 rounded-xl p-5 text-left relative transition-colors disabled:opacity-50 ${
+              selected === pkg.id ? "border-primary" : "border-border hover:border-primary/40"
+            }`}
+          >
+            {pkg.popular && (
+              <div className="absolute top-3 right-3 bg-accent text-accent-foreground font-heading text-[10px] font-bold px-2 py-1 rounded-md">
+                Popular
+              </div>
+            )}
+            <div className="flex items-center gap-3 mb-3">
+              <Coins className="h-5 w-5 text-primary" />
+              <span className="font-heading text-xl font-bold text-foreground">
+                {pkg.coins.toLocaleString()}
+              </span>
+            </div>
+            {pkg.bonus > 0 && (
+              <div className="flex items-center gap-1 mb-3">
+                <Gift className="h-3 w-3 text-accent" />
+                <span className="font-body text-xs text-accent font-medium">
+                  +{pkg.bonus} bonus
+>>>>>>> origin/main
                 </span>
               </div>
               {pkg.bonus > 0 && (
@@ -340,7 +408,11 @@ const TopUp = () => {
           className="bg-primary text-primary-foreground font-heading text-sm font-semibold px-8 py-3 rounded-lg flex items-center gap-3 hover:opacity-90 transition-opacity disabled:opacity-60"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Coins className="h-5 w-5" />}
+<<<<<<< HEAD
           {loading ? "Opening secure checkout…" : verified ? "Purchase Now" : "Verify to continue"}
+=======
+          {loading ? "Opening secure checkout…" : "Purchase Now"}
+>>>>>>> origin/main
         </button>
       )}
     </AppLayout>

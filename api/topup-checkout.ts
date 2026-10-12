@@ -1,5 +1,6 @@
 // Vercel function: /api/topup-checkout
 // Creates a Stripe Checkout Session for an authenticated player.
+<<<<<<< HEAD
 //   POST { "packageId": "3", "deviceHash": "nexd_v1_..." }
 //        with  Authorization: Bearer <access token>
 // -> { "url": "https://checkout.stripe.com/c/pay/..." }
@@ -8,6 +9,13 @@ import Stripe from "stripe";
 import { findPackage } from "../lib/server/packages.js";
 import { getAdminClient, isServerConfigured } from "../lib/server/admin.js";
 import { assertTopupEligible } from "../lib/server/ageVerification.js";
+=======
+//   POST { "packageId": "3" }  with  Authorization: Bearer <access token>
+// -> { "url": "https://checkout.stripe.com/c/pay/..." }
+import Stripe from "stripe";
+import { findPackage } from "../lib/server/packages.js";
+import { getAdminClient, isServerConfigured } from "../lib/server/admin.js";
+>>>>>>> origin/main
 
 export const config = { runtime: "nodejs" } as const;
 
@@ -38,7 +46,11 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: "SERVER_NOT_CONFIGURED", message: "Missing Supabase server env." }, 503);
   }
 
+<<<<<<< HEAD
   let body: { packageId?: string; deviceHash?: string };
+=======
+  let body: { packageId?: string };
+>>>>>>> origin/main
   try {
     body = await request.json();
   } catch {
@@ -57,6 +69,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   const user = userData.user;
 
+<<<<<<< HEAD
   // 3b) Age gate. The browser cannot skip this: a complete age_verifications
   //     row for the device is required, with extra rules for minors and 50+.
   const deviceHash = typeof body?.deviceHash === "string" ? body.deviceHash : "";
@@ -68,6 +81,8 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+=======
+>>>>>>> origin/main
   // 4) Create the Stripe Checkout Session. The server owns the price — the
   //    client never sends currency amounts.
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {

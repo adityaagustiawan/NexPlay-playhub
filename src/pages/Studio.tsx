@@ -26,6 +26,7 @@ import {
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
 import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
+<<<<<<< HEAD
 import {
   activeCamera,
   addObject,
@@ -54,6 +55,8 @@ import {
   type Scene,
   type Vec3,
 } from "@/lib/scene3d";
+=======
+>>>>>>> origin/main
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
@@ -99,9 +102,12 @@ import {
   Square,
   Sun,
   Upload,
+<<<<<<< HEAD
   Video,
   ZoomIn,
   ZoomOut,
+=======
+>>>>>>> origin/main
 } from "lucide-react";
 
 const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "Scripting"];
@@ -109,6 +115,7 @@ const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "
 // Minimum time the "asset import" build overlay stays visible when saving.
 const BUILD_MIN_MS = 1600;
 
+<<<<<<< HEAD
 /** Display label for an addable primitive. */
 const primitiveLabel = (kind: PrimitiveKind): string =>
   ({
@@ -125,6 +132,8 @@ const primitiveLabel = (kind: PrimitiveKind): string =>
 /** Keeps object scale inside a sane range so gizmo drags can't explode. */
 const clampScale = (v: number) => Math.max(0.02, Math.min(40, v));
 
+=======
+>>>>>>> origin/main
 const TOOL_TIPS: Record<string, string> = {
   Layout: "Model, script and preview — the default Blender-style layout.",
   Modeling: "Edit the mesh and object transforms.",
@@ -153,6 +162,7 @@ const SHADING = [
   { id: "rend", icon: Camera, label: "Rendered", tip: "Full render preview." },
 ];
 
+<<<<<<< HEAD
 /** Sculpt-mode brushes, mirroring Blender's brush presets. */
 const SCULPT_BRUSHES: { id: string; label: string; tip: string; hint?: string }[] = [
   { id: "draw", label: "Draw", tip: "Pull the surface along the stroke", hint: "X" },
@@ -162,6 +172,8 @@ const SCULPT_BRUSHES: { id: string; label: string; tip: string; hint?: string }[
   { id: "flatten", label: "Flatten", tip: "Pull the surface onto the brush's entry plane", hint: "Shift+F" },
 ];
 
+=======
+>>>>>>> origin/main
 const PROP_TABS: PropTab[] = [
   { id: "render", label: "Render", icon: Camera },
   { id: "output", label: "Output", icon: Image },
@@ -235,6 +247,7 @@ const Studio = () => {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OutlinerKey>("game");
 
+<<<<<<< HEAD
   // ---- 3D scene (the Blender-like editor) ----
   const [scene, setScene] = useState<Scene>(() => createDemoScene());
   const [objectId, setObjectId] = useState<string | null>(null);
@@ -247,6 +260,8 @@ const Studio = () => {
   const [cursor, setCursor] = useState<Vec3>(() => v3(0, 0, 0));
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
+=======
+>>>>>>> origin/main
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
   const [propTab, setPropTab] = useState("scene");
@@ -376,6 +391,7 @@ const Studio = () => {
       setConfig((c) => ({ ...c, names: { ...c.names, [k]: v } })),
   };
 
+<<<<<<< HEAD
   // ---- 3D scene actions (Blender-style Add, delete, transform, sculpt) ----
 
   const selectedObject = findObject(scene, objectId);
@@ -703,6 +719,8 @@ const Studio = () => {
     [objectId],
   );
 
+=======
+>>>>>>> origin/main
   const persist = async (publish: boolean, opts?: { asNew?: boolean; title?: string }) => {
     setNotice(null);
     setError(null);
@@ -843,8 +861,11 @@ const Studio = () => {
 
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
+<<<<<<< HEAD
   // Which axis the gizmo drags on, mirroring Blender's G/R/S tools.
   const transformMode = tool === "Rotate" ? "rotate" : tool === "Scale" ? "scale" : "move";
+=======
+>>>>>>> origin/main
 
   // Input device detection + navigation intents, ported from blender-web's
   // web-input-detector (GHOST-inspired). Drives zoom / pan / orbit in the 3D
@@ -882,6 +903,7 @@ const Studio = () => {
       },
     },
     { id: "file.new", label: "File: New Game", hint: "Ctrl+N", run: newGame },
+<<<<<<< HEAD
     { id: "view.ai", label: "View: Toggle AI Assistant", hint: "A", run: () => setShowAIAssistant((v) => !v) },
     { id: "ai.muse", label: "Muse: Build / edit with AI", hint: "A", run: () => setShowAIAssistant(true) },
     { id: "view.front", label: "View: Front", hint: "1", run: () => viewportRef.current?.setView("front") },
@@ -892,6 +914,14 @@ const Studio = () => {
     { id: "view.frame.selected", label: "View: Frame Selected", run: () => viewportRef.current?.frameSelected() },
     { id: "view.zoom.in", label: "View: Zoom In", hint: "Ctrl + +", run: () => viewportRef.current?.zoom(1.25) },
     { id: "view.zoom.out", label: "View: Zoom Out", hint: "Ctrl + -", run: () => viewportRef.current?.zoom(0.8) },
+=======
+    { id: "view.ai", label: "View: Toggle AI Assistant", hint: "Shift+A", run: () => setShowAIAssistant((v) => !v) },
+    { id: "ai.muse", label: "Muse: Build / edit with AI", hint: "Shift+A", run: () => setShowAIAssistant(true) },
+    { id: "view.front", label: "View: Front", hint: "Numpad 1", run: () => viewportRef.current?.setView("front") },
+    { id: "view.right", label: "View: Right", hint: "Numpad 3", run: () => viewportRef.current?.setView("right") },
+    { id: "view.top", label: "View: Top", hint: "Numpad 7", run: () => viewportRef.current?.setView("top") },
+    { id: "view.camera", label: "View: Camera", hint: "Numpad 0", run: () => viewportRef.current?.setView("camera") },
+>>>>>>> origin/main
     { id: "view.toolbar", label: "View: Toggle Toolbar", hint: "T", run: () => setShowToolbar((v) => !v) },
     { id: "view.properties", label: "View: Toggle Properties", hint: "N", run: () => setShowPanels((v) => !v) },
     {
@@ -900,6 +930,7 @@ const Studio = () => {
       hint: "Tab",
       run: () => setEditMode((m) => (m === "Object Mode" ? "Edit Mode" : "Object Mode")),
     },
+<<<<<<< HEAD
     { id: "object.duplicate", label: "Object: Duplicate", hint: "Shift+D", run: duplicateSelectionAction },
     { id: "object.delete", label: "Object: Delete", hint: "X", run: deleteSelection },
     { id: "object.active.camera", label: "Object: Set Active Camera", run: activateSelectedCamera },
@@ -917,6 +948,8 @@ const Studio = () => {
     { id: "mesh.vertices.all", label: "Mesh: Select All Vertices", hint: "A", run: selectAllVertices },
     { id: "mesh.vertices.duplicate", label: "Mesh: Duplicate Vertices", run: duplicateSelectedVertices },
     { id: "mesh.vertices.scale", label: "Mesh: Scale Vertices", run: () => scaleSelectedVertices(1.2) },
+=======
+>>>>>>> origin/main
     { id: "add.2d", label: "Add: 2D Game", run: () => setDimension("2d") },
     { id: "add.3d", label: "Add: 3D Game", run: () => setDimension("3d") },
     { id: "window.fullscreen", label: "Window: Fullscreen", run: toggleFullscreen },
@@ -928,7 +961,11 @@ const Studio = () => {
   ];
 
   // Blender-style unmodified keymap: T toolbar, N properties, Tab mode switch,
+<<<<<<< HEAD
   // numpad views, X delete, Shift+D duplicate, Shift+A add, F3 operator search.
+=======
+  // numpad views, F3 operator search.
+>>>>>>> origin/main
   useEffect(() => {
     const isTyping = (target: EventTarget | null) => {
       const el = target as HTMLElement | null;
@@ -944,6 +981,7 @@ const Studio = () => {
         setOperatorOpen((v) => !v);
         return;
       }
+<<<<<<< HEAD
       // Sculpt mode borrows Blender's brush hotkeys (X/S/G/I, Shift+F).
       if (modeKey === "sculpt") {
         const k = e.key.toLowerCase();
@@ -959,11 +997,14 @@ const Studio = () => {
           return;
         }
       }
+=======
+>>>>>>> origin/main
       if (e.key === "Tab") {
         e.preventDefault();
         setEditMode((m) => (m === "Object Mode" ? "Edit Mode" : "Object Mode"));
         return;
       }
+<<<<<<< HEAD
       if (e.shiftKey && e.key === "A") {
         e.preventDefault();
         setAddMenuOpen((v) => !v);
@@ -979,6 +1020,8 @@ const Studio = () => {
         duplicateSelectionAction();
         return;
       }
+=======
+>>>>>>> origin/main
       switch (e.key) {
         case "t":
           setShowToolbar((v) => !v);
@@ -996,17 +1039,26 @@ const Studio = () => {
           viewportRef.current?.setView("top");
           break;
         case "0":
+<<<<<<< HEAD
           toggleCameraPov();
+=======
+          viewportRef.current?.setView("camera");
+>>>>>>> origin/main
           break;
         case "Home":
           viewportRef.current?.frameAll();
           break;
+<<<<<<< HEAD
         case ".":
           viewportRef.current?.frameSelected();
           break;
         case "A":
           if (modeKey === "edit" || modeKey === "vertexpaint") selectAllVertices();
           else setShowAIAssistant((v) => !v);
+=======
+        case "A":
+          setShowAIAssistant((v) => !v);
+>>>>>>> origin/main
           break;
         default:
           break;
@@ -1014,8 +1066,12 @@ const Studio = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+<<<<<<< HEAD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.dimension, deleteSelection, duplicateSelectionAction, modeKey, selectAllVertices, toggleCameraPov]);
+=======
+  }, []);
+>>>>>>> origin/main
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -1165,6 +1221,7 @@ const Studio = () => {
     },
   ];
 
+<<<<<<< HEAD
   /** Blender's Add menu: Mesh / Light / Camera, spawning on the 3D cursor. */
   const addMenuItems: StudioMenuEntry[] = [
     { section: "Mesh" },
@@ -1182,6 +1239,8 @@ const Studio = () => {
     { label: "Camera", onSelect: addCameraObject },
   ];
 
+=======
+>>>>>>> origin/main
   const headerMenus: { label: string; items: StudioMenuEntry[] }[] = [
     {
       label: "View",
@@ -1192,6 +1251,7 @@ const Studio = () => {
           onSelect: () => setShading(s.id),
         })),
         { separator: true },
+<<<<<<< HEAD
         { label: "Frame All", shortcut: "Home", onSelect: () => viewportRef.current?.frameAll() },
         { label: "Frame Selected", shortcut: ".", onSelect: () => viewportRef.current?.frameSelected() },
         { label: "Front", shortcut: "1", onSelect: () => viewportRef.current?.setView("front") },
@@ -1203,6 +1263,16 @@ const Studio = () => {
         { separator: true },
         { label: "Toggle Toolbar", shortcut: "T", checked: showToolbar, onSelect: () => setShowToolbar((v) => !v) },
         { label: "Toggle Properties", shortcut: "N", checked: showPanels, onSelect: () => setShowPanels((v) => !v) },
+=======
+        { label: "Frame All", onSelect: () => viewportRef.current?.frameAll() },
+        { label: "Front", onSelect: () => viewportRef.current?.setView("front") },
+        { label: "Right", onSelect: () => viewportRef.current?.setView("right") },
+        { label: "Top", onSelect: () => viewportRef.current?.setView("top") },
+        { label: "Camera", onSelect: () => viewportRef.current?.setView("camera") },
+        { separator: true },
+        { label: "Toggle Toolbar", checked: showToolbar, onSelect: () => setShowToolbar((v) => !v) },
+        { label: "Toggle Properties", checked: showPanels, onSelect: () => setShowPanels((v) => !v) },
+>>>>>>> origin/main
         { label: "Fullscreen", onSelect: toggleFullscreen },
       ],
     },
@@ -1219,11 +1289,23 @@ const Studio = () => {
     },
     {
       label: "Add",
+<<<<<<< HEAD
       items: addMenuItems,
+=======
+      items: [
+        { label: "2D Game", checked: config.dimension === "2d", onSelect: () => setDimension("2d") },
+        { label: "3D Game", checked: config.dimension === "3d", onSelect: () => setDimension("3d") },
+        { separator: true },
+        { label: "Catch mode", checked: config.mode === "catch", onSelect: () => setConfig((c) => ({ ...c, mode: "catch" })) },
+        { label: "Shooter mode", checked: config.mode === "shooter", onSelect: () => setConfig((c) => ({ ...c, mode: "shooter" })) },
+        { label: "Runner mode", checked: config.mode === "runner", onSelect: () => setConfig((c) => ({ ...c, mode: "runner" })) },
+      ],
+>>>>>>> origin/main
     },
     {
       label: "Object",
       items: [
+<<<<<<< HEAD
         { label: "Duplicate", shortcut: "Shift+D", onSelect: duplicateSelectionAction },
         { label: "Delete", shortcut: "X", onSelect: deleteSelection },
         { separator: true },
@@ -1246,10 +1328,16 @@ const Studio = () => {
             });
           },
         },
+=======
+        { label: "Easy", checked: config.difficulty === "easy", onSelect: () => setConfig((c) => ({ ...c, difficulty: "easy" })) },
+        { label: "Medium", checked: config.difficulty === "medium", onSelect: () => setConfig((c) => ({ ...c, difficulty: "medium" })) },
+        { label: "Hard", checked: config.difficulty === "hard", onSelect: () => setConfig((c) => ({ ...c, difficulty: "hard" })) },
+>>>>>>> origin/main
       ],
     },
   ];
 
+<<<<<<< HEAD
   /** Blender's brush/vertex strip under the header, per editing mode. */
   const modeBar =
     config.dimension !== "3d" ? null : (
@@ -1387,6 +1475,8 @@ const Studio = () => {
       </p>
     </div>
   );
+=======
+>>>>>>> origin/main
   // ---- Properties content per tab ----
   const gameFields = (
     <>
@@ -1705,6 +1795,7 @@ const Studio = () => {
               })}
               <div className="mx-1 h-4 w-px bg-[#3d3d3d]" />
               <span className="text-[10px] text-[#8f8f8f]">Viewport</span>
+<<<<<<< HEAD
               {dimension === "3d" && (
                 <>
                   <Tip label="Zoom out" description="Wheel, pinch or two-finger drag zoom." shortcut="Ctrl + -" enabled={showTips} side="bottom">
@@ -1736,6 +1827,8 @@ const Studio = () => {
                   </Tip>
                 </>
               )}
+=======
+>>>>>>> origin/main
               <Tip label="2D viewport" description="Flat canvas for 2D games." enabled={showTips} side="bottom">
                 <button type="button" onClick={() => setDimension("2d")} className={segCls(dimension === "2d")}>
                   2D
@@ -1774,6 +1867,7 @@ const Studio = () => {
             tools={TOOLS}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
+<<<<<<< HEAD
             viewport={{
               scene,
               selectedId: objectId,
@@ -1802,6 +1896,8 @@ const Studio = () => {
             onToggleObjectVisible={toggleObjectVisible}
             modeBar={modeBar}
             addMenu={addMenuFlyout}
+=======
+>>>>>>> origin/main
             panelWidth={panelWidth}
             setPanelWidth={setPanelWidth}
             outlinerHeight={outlinerHeight}

@@ -11,13 +11,19 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
 
 # Environment files (values are public anon keys, but don't commit them)
 .env
 
+<<<<<<< HEAD
 # Supabase CLI local link state (db password is never stored here, but the
 # pooler/link files are machine-specific)
 supabase/.temp
+=======
+# Supabase CLI scratch (link state)
+supabase/.temp/
+>>>>>>> origin/main
 
 # Editor directories and files
 .vscode/*

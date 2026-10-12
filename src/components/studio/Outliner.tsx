@@ -1,4 +1,5 @@
 // Outliner.tsx — Blender-style scene hierarchy for the game being edited.
+<<<<<<< HEAD
 // Selecting a node drives the Properties editor on the right. When a 3D scene
 // is present, its objects are listed under "Scene Collection" so cameras,
 // lights and meshes can be clicked like in Blender.
@@ -6,6 +7,12 @@ import { Box, Bomb, Camera, ChevronDown, Eye, EyeOff, Globe, Lightbulb, Palette,
 import type { ComponentType } from "react";
 import { GOOD_LABEL, BAD_LABEL, type Mode } from "@/lib/studioConfig";
 import type { SceneObject } from "@/lib/scene3d";
+=======
+// Selecting a node drives the Properties editor on the right.
+import { Box, Bomb, ChevronDown, Globe, Palette, Target, User } from "lucide-react";
+import type { ComponentType } from "react";
+import { GOOD_LABEL, BAD_LABEL, type Mode } from "@/lib/studioConfig";
+>>>>>>> origin/main
 
 export type OutlinerKey = "game" | "player" | "good" | "bad" | "environment" | "world";
 
@@ -14,12 +21,15 @@ interface Props {
   mode: Mode;
   selected: OutlinerKey;
   onSelect: (key: OutlinerKey) => void;
+<<<<<<< HEAD
   /** 3D scene objects to list under the scene collection. */
   objects?: SceneObject[];
   /** Selected 3D object id. */
   selectedObjectId?: string | null;
   onSelectObject?: (id: string) => void;
   onToggleObjectVisible?: (id: string, visible: boolean) => void;
+=======
+>>>>>>> origin/main
 }
 
 interface NodeDef {
@@ -27,6 +37,7 @@ interface NodeDef {
   icon: ComponentType<{ className?: string }>;
 }
 
+<<<<<<< HEAD
 /** Icon per object kind, Blender-style: box for meshes, camera, lamp. */
 const OBJECT_ICONS: Record<SceneObject["kind"], ComponentType<{ className?: string }>> = {
   mesh: Box,
@@ -45,6 +56,9 @@ export function Outliner({
   onSelectObject,
   onToggleObjectVisible,
 }: Props) {
+=======
+export function Outliner({ title, mode, selected, onSelect }: Props) {
+>>>>>>> origin/main
   const children: NodeDef[] = [
     { key: "player", icon: User },
     { key: "good", icon: Target },
@@ -98,6 +112,7 @@ export function Outliner({
             indent={20}
           />
         ))}
+<<<<<<< HEAD
         {objects && objects.length > 0 && (
           <div className="mt-1.5 border-t border-[#3d3d3d] pt-1.5">
             <div className="px-1 pb-1 text-[10px] uppercase tracking-wide text-[#8a8a8a]">Scene Collection</div>
@@ -137,6 +152,8 @@ export function Outliner({
             })}
           </div>
         )}
+=======
+>>>>>>> origin/main
         <Row node="world" label="World" indent={2} />
       </div>
     </div>
