@@ -17,6 +17,8 @@ export interface GameInstance {
   destroy(): void;
   submitScore(score: number): void;
   getState(): GameState;
+  /** Pause or resume the simulation (Unity-style play mode). */
+  setPaused(paused: boolean): void;
 }
 
 export interface GameState {
@@ -106,6 +108,7 @@ export function mountGame(
   let lastShot = 0;
   let message = "";
   let messageUntil = 0;
+  let paused = false;
 
   const UP = new Set(["ArrowUp", "w", "W", " "]);
   const DOWN = new Set(["ArrowDown", "s", "S"]);
