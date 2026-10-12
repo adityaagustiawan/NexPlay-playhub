@@ -10,13 +10,27 @@ import {
   v3,
 } from "@/lib/scene3d";
 import {
+  exportFbx,
   exportGlb,
   exportObj,
   exportStl,
+  faceNormal,
   importGlb,
   importObj,
   triangulate,
 } from "@/lib/gltf";
+
+/** Extracts the JSON chunk of a GLB byte array (for structural assertions). */
+function glbJson(bytes: Uint8Array): any {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jlen = dv.getUint32(12, true);
+  return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jlen)));
+}
+
+const hexToRgb = (hex: string): [number, number, number, number] => {
+  const n = parseInt(hex.replace(/^#/, ""), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+};
 
 /** Builds a minimal GLB with a single triangle (positions + indices). */
 function makeTriangleGlb(): ArrayBuffer {
