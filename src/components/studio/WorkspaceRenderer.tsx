@@ -76,6 +76,9 @@ interface LayoutProps {
   tools: { icon: any; label: string; tip?: string; shortcut?: string; action?: () => void }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
+  /** Optional drag-&-drop import handlers attached to the 3D viewport body. */
+  onViewportDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onViewportDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   setEditMode?: (m: string) => void;
   panelWidth: number;
   setPanelWidth: (n: number) => void;
@@ -130,6 +133,8 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tools,
     viewportRef,
     viewportBodyRef,
+    onViewportDragOver,
+    onViewportDrop,
     setEditMode,
     panelWidth,
     setPanelWidth,
@@ -181,7 +186,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
             {headerMenusRender()}
           </div>
           {modeBar}
-          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
+          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]" onDragOver={onViewportDragOver} onDrop={onViewportDrop}>
             {game && game.status !== "stopped" ? (
               <GameView
                 pkg={game.pkg}
@@ -276,7 +281,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
   const left = (
     <div className="flex min-h-0 flex-1 flex-col">
       {modeBar}
-      <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
+      <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]" onDragOver={onViewportDragOver} onDrop={onViewportDrop}>
         {game && game.status !== "stopped" ? (
           <GameView
             pkg={game.pkg}
