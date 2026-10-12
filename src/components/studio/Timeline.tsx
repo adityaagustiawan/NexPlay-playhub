@@ -10,11 +10,13 @@ interface Props {
   fps?: number;
   frame: number;
   playing: boolean;
+  autoKey?: boolean;
   endFrame: number;
   /** Frame numbers that carry any keyframe, for the key diamonds. */
   keyFrames?: number[];
   onFrameChange: (frame: number) => void;
   onTogglePlay: () => void;
+  onToggleAutoKey?: () => void;
   onInsertKeyframe: (channel: Channel) => void;
 }
 
@@ -29,10 +31,12 @@ export function Timeline({
   fps = 24,
   frame,
   playing,
+  autoKey = true,
   endFrame = 120,
   keyFrames = [],
   onFrameChange,
   onTogglePlay,
+  onToggleAutoKey,
   onInsertKeyframe,
 }: Props) {
   const [insertOpen, setInsertOpen] = useState(false);
@@ -101,13 +105,23 @@ export function Timeline({
           <button
             type="button"
             className="flex h-6 items-center gap-1 rounded-[3px] border border-[#e6cd5b]/40 px-2 text-[#e6cd5b] hover:bg-[#3a3a3a]"
-            title="Insert keyframe (I)"
+            title="Insert keyframe (I) — Location/Rotation/Scale at current frame"
             onClick={() => setInsertOpen((v) => !v)}
           >
             <Diamond size={11} fill="currentColor" /> Insert
           </button>
           {insertOpen && (
             <div className="absolute right-0 top-7 z-20 w-44 rounded-[4px] border border-[#1d1d1d] bg-[#383838] py-1 shadow-xl">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#4772b3]"
+                onClick={() => {
+                  onInsertKeyframe("all");
+                  setInsertOpen(false);
+                }}
+              >
+                <Diamond size={10} fill="#e6cd5b" stroke="#e6cd5b" /> All (Loc/Rot/Sca)
+              </button>
               {(
                 [
                   ["pos", "Location"],
