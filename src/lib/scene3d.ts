@@ -308,7 +308,10 @@ export const createPlane = (size = 4, divisions = 2): MeshData => {
       const b = a + 1;
       const c = (z + 1) * row + x + 1;
       const d = (z + 1) * row + x;
-      faces.push([a, b, c, d]);
+      // Wind the quad so its front face points +Y (up). The viewport shades
+      // both sides, but real engines (Godot/Unreal) cull backfaces — a floor
+      // with -Y normals would be invisible from above after export.
+      faces.push([a, d, c, b]);
     }
   }
   return { vertices, faces };
