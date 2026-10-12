@@ -35,6 +35,19 @@ export function triangulate(faces: number[][]): number[][] {
   return out;
 }
 
+/** Unit-length face normal (area-weighted cross product). */
+export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const n: Vec3 = [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+  const len = Math.hypot(n[0], n[1], n[2]);
+  return len > 1e-12 ? [n[0] / len, n[1] / len, n[2] / len] : [0, 0, 1];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return [0.88, 0.88, 0.88];
@@ -324,82 +337,113 @@ export interface GlbOptions {
   name?: string;
 }
 
-/** Serialises the scene to a glTF-Binary 2.0 (.glb) file. */
+/** Serialises the scene to a glTF-Binary 2.0 (.glb) file.
+ *
+ * Godot imports GLB natively; Unreal 5 (Interchange) and Blender/Unity read it
+ * too. Geometry is written as triangle-corner vertices with flat NORMAL
+ * attributes (matching the studio's flat-shaded look) plus one PBR material per
+ * object carrying its colour, so engines shade it correctly without textures. */
 export function exportGlb(scene: Scene, opts: GlbOptions = {}): Uint8Array {
   const objects = sceneMeshObjects(scene);
   if (objects.length === 0) throw new Error("Nothing to export — the scene has no mesh objects.");
-
-  interface Record {
-    nodeId: number;
-  }
 
   const accessors: any[] = [];
   const bufferViews: any[] = [];
   const nodes: any[] = [];
   const meshDefs: any[] = [];
+  const materials: any[] = [];
   const nodeOrder: number[] = [];
 
   const align4 = (n: number) => (n % 4 === 0 ? n : n + (4 - (n % 4)));
 
-  // --- Concatenate every object's LOCAL POSITION + indices into one BIN chunk,
-  //     and record bufferView/accessor offsets as we go (4-byte aligned). The
-  //     node's TRS matrix carries the object transform (glTF-idiomatic), so the
-  //     file re-opens with the same hierarchy instead of double-transforming.
+  // --- Concatenate every object's LOCAL geometry into one BIN chunk. The node's
+  //     TRS matrix carries the object transform (glTF-idiomatic), so the file
+  //     re-opens with the same hierarchy instead of double-transforming.
   const binParts: Uint8Array[] = [];
   let cursor = 0;
+  const pushView = (bytes: Uint8Array) => {
+    const view = bufferViews.length;
+    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: bytes.length });
+    binParts.push(bytes);
+    cursor = align4(cursor + bytes.length);
+    return view;
+  };
+
   objects.forEach((obj) => {
     const tris = triangulate(obj.mesh!.faces);
     if (tris.length === 0) return;
-    const verts = obj.mesh!.vertices;
+    const src = obj.mesh!.vertices;
+
+    // One vertex per triangle corner: position + flat normal (hard edges), which
+    // is exactly how the viewport shades the scene.
+    const pos: number[] = [];
+    const nrm: number[] = [];
+    for (const f of tris) {
+      const a = src[f[0]];
+      const b = src[f[1]];
+      const c = src[f[2]];
+      const n = faceNormal(a, b, c);
+      pos.push(...a, ...b, ...c);
+      nrm.push(...n, ...n, ...n);
+    }
+    const vertCount = pos.length / 3;
     const idx: number[] = [];
-    for (const f of tris) idx.push(f[0], f[1], f[2]);
-    const maxIdx = idx.length ? Math.max(...idx) : 0;
-    const comp = maxIdx < 65536 ? 5123 : 5125;
+    for (let i = 0; i < vertCount; i++) idx.push(i);
 
-    const posBytes = new Uint8Array(new Float32Array(verts.flat()).buffer);
+    // Corner-split streams can exceed 65,535 vertices on big models — pick the
+    // index component type by size so Unreal/Godot/Blender read it either way.
+    const comp = vertCount <= 65535 ? 5123 : 5125;
     const idxBytes =
-      comp === 5123 ? new Uint8Array(new Uint16Array(idx).buffer) : new Uint8Array(new Uint32Array(idx).buffer);
+      comp === 5123
+        ? new Uint8Array(new Uint16Array(idx).buffer)
+        : new Uint8Array(new Uint32Array(idx).buffer);
 
-    const posView = bufferViews.length;
-    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: posBytes.length });
-    binParts.push(posBytes);
-    cursor = align4(cursor + posBytes.length);
+    const posView = pushView(posBytes);
+    const nrmView = pushView(nrmBytes);
+    const idxView = pushView(idxBytes);
 
-    const idxView = bufferViews.length;
-    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: idxBytes.length });
-    binParts.push(idxBytes);
-    cursor = align4(cursor + idxBytes.length);
-
+    const xs = [], ys = [], zs = [];
+    for (let i = 0; i < pos.length; i += 3) {
+      xs.push(pos[i]);
+      ys.push(pos[i + 1]);
+      zs.push(pos[i + 2]);
+    }
     const posAcc = accessors.length;
     accessors.push({
       bufferView: posView,
       componentType: 5126,
-      count: verts.length,
+      count: vertCount,
       type: "VEC3",
-      min: [
-        Math.min(...verts.map((v) => v[0])),
-        Math.min(...verts.map((v) => v[1])),
-        Math.min(...verts.map((v) => v[2])),
-      ],
-      max: [
-        Math.max(...verts.map((v) => v[0])),
-        Math.max(...verts.map((v) => v[1])),
-        Math.max(...verts.map((v) => v[2])),
-      ],
+      min: [Math.min(...xs), Math.min(...ys), Math.min(...zs)],
+      max: [Math.max(...xs), Math.max(...ys), Math.max(...zs)],
     });
+    const nrmAcc = accessors.length;
+    accessors.push({ bufferView: nrmView, componentType: 5126, count: vertCount, type: "VEC3" });
     const idxAcc = accessors.length;
-    accessors.push({
-      bufferView: idxView,
-      componentType: comp,
-      count: idx.length,
-      type: "SCALAR",
+    accessors.push({ bufferView: idxView, componentType: 5123, count: idx.length, type: "SCALAR" });
+
+    const matId = materials.length;
+    materials.push({
+      name: `${obj.name}_mat`,
+      pbrMetallicRoughness: {
+        baseColorFactor: [...hexToRgb(obj.color ?? "#e0e0e0"), 1],
+        metallicFactor: 0.0,
+        roughnessFactor: 1.0,
+      },
     });
 
     const meshId = meshDefs.length;
     const nodeId = nodes.length;
     meshDefs.push({
       name: obj.name,
-      primitives: [{ attributes: { POSITION: posAcc }, indices: idxAcc, mode: 4, material: 0 }],
+      primitives: [
+        {
+          attributes: { POSITION: posAcc, NORMAL: nrmAcc },
+          indices: idxAcc,
+          mode: 4,
+          material: matId,
+        },
+      ],
     });
     nodes.push({ name: obj.name, mesh: meshId, matrix: sceneObjectMatrix(obj) });
     nodeOrder.push(nodeId);
@@ -421,16 +465,7 @@ export function exportGlb(scene: Scene, opts: GlbOptions = {}): Uint8Array {
     accessors,
     bufferViews,
     buffers: [{ byteLength: bin.length }],
-    materials: [
-      {
-        name: "Material",
-        pbrMetallicRoughness: {
-          baseColorFactor: [0.8, 0.8, 0.8, 1],
-          metallicFactor: 0.08,
-          roughnessFactor: 0.82,
-        },
-      },
-    ],
+    materials,
   };
   const jsonBytes = new TextEncoder().encode(JSON.stringify(json));
   const jsonPad = align4(jsonBytes.length) - jsonBytes.length;
@@ -523,6 +558,219 @@ export function exportStl(scene: Scene, name = "scene"): string {
   }
   lines.push(`endsolid ${name.replace(/\s+/g, "_")}`);
   return lines.join("\n") + "\n";
+}
+
+// ---------------------------------------------------------------- export FBX
+
+export interface FbxOptions {
+  /** Scene name (default "Scene"). */
+  name?: string;
+}
+
+const fbxFloat = (n: number): string => (Number.isFinite(n) ? n.toFixed(5) : "0.00000");
+
+/** Writes an ASCII numeric array property in repeatable `a:` lines. */
+function fbxArray(label: string, values: number[], tab: number): string[] {
+  const lines: string[] = [];
+  lines.push(`${"\t".repeat(tab)}${label}: *${values.length} {`);
+  for (let i = 0; i < values.length; i += 100) {
+    lines.push(`${"\t".repeat(tab + 1)}a: ${values.slice(i, i + 100).map(fbxFloat).join(",")}`);
+  }
+  lines.push(`${"\t".repeat(tab)}}`);
+  return lines;
+}
+
+/** Serialises the scene to an ASCII FBX 7.4 file.
+ *
+ * Unreal Engine's native import format, also read by Blender and Godot.
+ * Geometry is Y-up (Unreal converts to Z-up on import), triangle-corner
+ * vertices with flat normals and one diffuse material per object — the whole
+ * scene keeps names, transforms and colours when it lands in the engine. */
+export function exportFbx(scene: Scene, opts: FbxOptions = {}): string {
+  const objects = sceneMeshObjects(scene);
+  if (objects.length === 0) throw new Error("Nothing to export — the scene has no mesh objects.");
+
+  interface Part {
+    name: string;
+    verts: number[];
+    norms: number[];
+    poly: number[];
+    color: [number, number, number];
+    obj: SceneObject;
+  }
+  const parts: Part[] = [];
+  for (const obj of objects) {
+    const tris = triangulate(obj.mesh!.faces);
+    if (tris.length === 0) continue;
+    const src = obj.mesh!.vertices;
+    const verts: number[] = [];
+    const norms: number[] = [];
+    const poly: number[] = [];
+    for (let t = 0; t < tris.length; t++) {
+      const f = tris[t];
+      const a = src[f[0]];
+      const b = src[f[1]];
+      const c = src[f[2]];
+      const n = faceNormal(a, b, c);
+      const base = t * 3;
+      verts.push(...a, ...b, ...c);
+      norms.push(...n, ...n, ...n);
+      poly.push(base, base + 1, -(base + 2) - 1);
+    }
+    parts.push({
+      name: obj.name.replace(/["{}\s]/g, "_") || "Mesh",
+      verts,
+      norms,
+      poly,
+      color: hexToRgb(obj.color ?? "#e0e0e0"),
+      obj,
+    });
+  }
+
+  const n = parts.length;
+  const geomStart = 1;
+  const modelStart = n + 1;
+  const matStart = 2 * n + 1;
+  const sceneName = (opts.name ?? "Scene").replace(/["{}\s]/g, "_") || "Scene";
+
+  const out: string[] = [];
+  const L = (tab: number, s: string) => out.push("\t".repeat(tab) + s);
+  out.push("; FBX 7.4.0 project file");
+  out.push("; Exported by NexPlay Studio — import into Unreal Engine (FBX), then edit/mesh as a Static Mesh actor.");
+  out.push("");
+  out.push("FBXHeaderExtension:  {");
+  L(1, "FBXHeaderVersion: 1003");
+  L(1, "FBXVersion: 7400");
+  L(1, 'Creator: "NexPlay Studio"');
+  out.push("}");
+  out.push("");
+  out.push('CreationTime: "2026-10-12 00:00:00:000"');
+  out.push('Creator: "NexPlay Studio"');
+  out.push("");
+  out.push("GlobalSettings:  {");
+  L(1, "Version: 1000");
+  L(1, "Properties70:  {");
+  L(2, 'P: "UpAxis", "int", "Integer", "",1');
+  L(2, 'P: "UpAxisSign", "int", "Integer", "",1');
+  L(2, 'P: "FrontAxis", "int", "Integer", "",2');
+  L(2, 'P: "FrontAxisSign", "int", "Integer", "",1');
+  L(2, 'P: "CoordAxis", "int", "Integer", "",0');
+  L(2, 'P: "CoordAxisSign", "int", "Integer", "",1');
+  L(2, 'P: "OriginalUpAxis", "int", "Integer", "",1');
+  L(2, 'P: "OriginalUpAxisSign", "int", "Integer", "",1');
+  L(2, 'P: "UnitScaleFactor", "double", "Number", "",1');
+  L(2, 'P: "OriginalUnitScaleFactor", "double", "Number", "",1');
+  L(2, 'P: "AmbientLightColor", "ColorRGB", "Color", "",0,0,0');
+  L(2, 'P: "DefaultCamera", "KString", "", "", "Producer Perspective"');
+  L(1, "}");
+  out.push("}");
+  out.push("");
+  out.push("Documents:  {");
+  L(1, "Count: 1");
+  L(1, `Document: 1234567890, "${sceneName}", "${sceneName}" {`);
+  L(2, "Properties70:  {");
+  L(3, 'P: "SourceObject", "object", "", ""');
+  L(3, 'P: "ActiveAnimStackName", "KString", "", "", ""');
+  L(2, "}");
+  L(2, "RootNode: 0");
+  L(1, "}");
+  out.push("}");
+  out.push("");
+  out.push("References:  {");
+  out.push("}");
+  out.push("");
+  out.push("Definitions:  {");
+  L(1, "Version: 100");
+  L(1, `Count: ${3 * n + 1}`);
+  L(1, 'ObjectType: "GlobalSettings" {');
+  L(2, "Count: 1");
+  L(1, "}");
+  L(1, 'ObjectType: "Model" {');
+  L(2, `Count: ${n}`);
+  L(1, "}");
+  L(1, 'ObjectType: "Geometry" {');
+  L(2, `Count: ${n}`);
+  L(1, "}");
+  L(1, 'ObjectType: "Material" {');
+  L(2, `Count: ${n}`);
+  L(1, "}");
+  out.push("}");
+  out.push("");
+  out.push("Objects:  {");
+  parts.forEach((part, i) => {
+    const geomId = geomStart + i;
+    const modelId = modelStart + i;
+    const matId = matStart + i;
+    L(1, `Geometry: ${geomId}, "Geometry::${part.name}", "Mesh" {`);
+    out.push(...fbxArray("Vertices", part.verts, 2));
+    out.push(...fbxArray("PolygonVertexIndex", part.poly, 2));
+    L(2, "GeometryVersion: 124");
+    L(2, "LayerElementNormal: 0 {");
+    L(3, "Version: 101");
+    L(3, 'Name: ""');
+    L(3, 'MappingInformationType: "ByPolygonVertex"');
+    L(3, 'ReferenceInformationType: "Direct"');
+    out.push(...fbxArray("Normals", part.norms, 3));
+    L(2, "}");
+    L(2, "LayerElementMaterial: 0 {");
+    L(3, "Version: 101");
+    L(3, 'Name: ""');
+    L(3, 'MappingInformationType: "AllSame"');
+    L(3, 'ReferenceInformationType: "IndexToDirect"');
+    out.push(...fbxArray("Materials", [0], 3));
+    L(2, "}");
+    L(2, "Layer: 0 {");
+    L(3, "Version: 100");
+    L(3, "LayerElement:  {");
+    L(4, 'Type: "LayerElementNormal"');
+    L(4, "TypedIndex: 0");
+    L(3, "}");
+    L(3, "LayerElement:  {");
+    L(4, 'Type: "LayerElementMaterial"');
+    L(4, "TypedIndex: 0");
+    L(3, "}");
+    L(2, "}");
+    L(1, "}");
+    L(1, `Model: ${modelId}, "Model::${part.name}", "Mesh" {`);
+    L(2, "Version: 232");
+    L(2, "Properties70:  {");
+    const t = part.obj.transform;
+    L(3, `P: "Lcl Translation", "Lcl Translation", "", "A",${fbxFloat(t.position[0])},${fbxFloat(t.position[1])},${fbxFloat(t.position[2])}`);
+    L(3, `P: "Lcl Rotation", "Lcl Rotation", "", "A",${fbxFloat(t.rotation[0])},${fbxFloat(t.rotation[1])},${fbxFloat(t.rotation[2])}`);
+    L(3, `P: "Lcl Scaling", "Lcl Scaling", "", "A",${fbxFloat(t.scale[0])},${fbxFloat(t.scale[1])},${fbxFloat(t.scale[2])}`);
+    L(2, "}");
+    L(2, "Shading: T");
+    L(2, 'Culling: "CullingOff"');
+    L(1, "}");
+    L(1, `Material: ${matId}, "Material::${part.name}_mat", "" {`);
+    L(2, "Version: 102");
+    L(2, 'ShadingModel: "phong"');
+    L(2, "MultiLayer: 0");
+    L(2, "Properties70:  {");
+    L(3, `P: "DiffuseColor", "Color", "", "A",${fbxFloat(part.color[0])},${fbxFloat(part.color[1])},${fbxFloat(part.color[2])}`);
+    L(3, 'P: "AmbientColor", "Color", "", "A",0.15,0.15,0.15');
+    L(2, "}");
+    L(1, "}");
+  });
+  out.push("}");
+  out.push("");
+  out.push("Connections:  {");
+  L(1, 'C: "OO", 0, 0');
+  parts.forEach((part, i) => {
+    const geomId = geomStart + i;
+    const modelId = modelStart + i;
+    const matId = matStart + i;
+    L(1, `C: "OO", ${modelId}, 0`);
+    L(1, `C: "OO", ${geomId}, ${modelId}`);
+    L(1, `C: "OO", ${matId}, ${modelId}`);
+  });
+  out.push("}");
+  out.push("");
+  out.push("Takes:  {");
+  L(1, 'Current: ""');
+  out.push("}");
+  out.push("");
+  return out.join("\n");
 }
 
 /** Triggers a browser download for a Blob. */
