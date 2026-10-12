@@ -10,11 +10,13 @@ interface Props {
   fps?: number;
   frame: number;
   playing: boolean;
+  autoKey?: boolean;
   endFrame: number;
   /** Frame numbers that carry any keyframe, for the key diamonds. */
   keyFrames?: number[];
   onFrameChange: (frame: number) => void;
   onTogglePlay: () => void;
+  onToggleAutoKey?: () => void;
   onInsertKeyframe: (channel: Channel) => void;
 }
 
@@ -29,10 +31,12 @@ export function Timeline({
   fps = 24,
   frame,
   playing,
+  autoKey = true,
   endFrame = 120,
   keyFrames = [],
   onFrameChange,
   onTogglePlay,
+  onToggleAutoKey,
   onInsertKeyframe,
 }: Props) {
   const [insertOpen, setInsertOpen] = useState(false);
