@@ -10,7 +10,8 @@ import { Timeline } from "@/components/studio/Timeline";
 import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
 import { NodeEditor } from "@/components/studio/NodeEditor";
-import { ImageEditor } from "@/components/studio/ImageEditor";
+import { SpriteEditor } from "./SpriteEditor";
+import { Viewport2D } from "./Viewport2D";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
 import { GameLogicEditor } from "@/components/studio/GameLogicEditor";
@@ -202,7 +203,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
       {dimension === "3d" ? (
         <Viewport3D ref={viewportRef} {...viewport} />
       ) : (
-        <GamePreview fill pkg={pkg} title={config.title || "Untitled"} onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined} />
+        <SpriteEditor />
       )}
     </div>
   );
