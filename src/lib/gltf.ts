@@ -35,6 +35,19 @@ export function triangulate(faces: number[][]): number[][] {
   return out;
 }
 
+/** Unit-length face normal (area-weighted cross product). */
+export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const n: Vec3 = [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+  const len = Math.hypot(n[0], n[1], n[2]);
+  return len > 1e-12 ? [n[0] / len, n[1] / len, n[2] / len] : [0, 0, 1];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return [0.88, 0.88, 0.88];
@@ -324,82 +337,109 @@ export interface GlbOptions {
   name?: string;
 }
 
-/** Serialises the scene to a glTF-Binary 2.0 (.glb) file. */
+/** Serialises the scene to a glTF-Binary 2.0 (.glb) file.
+ *
+ * Godot imports GLB natively; Unreal 5 (Interchange) and Blender/Unity read it
+ * too. Geometry is written as triangle-corner vertices with flat NORMAL
+ * attributes (matching the studio's flat-shaded look) plus one PBR material per
+ * object carrying its colour, so engines shade it correctly without textures. */
 export function exportGlb(scene: Scene, opts: GlbOptions = {}): Uint8Array {
   const objects = sceneMeshObjects(scene);
   if (objects.length === 0) throw new Error("Nothing to export — the scene has no mesh objects.");
-
-  interface Record {
-    nodeId: number;
-  }
 
   const accessors: any[] = [];
   const bufferViews: any[] = [];
   const nodes: any[] = [];
   const meshDefs: any[] = [];
+  const materials: any[] = [];
   const nodeOrder: number[] = [];
 
   const align4 = (n: number) => (n % 4 === 0 ? n : n + (4 - (n % 4)));
 
-  // --- Concatenate every object's LOCAL POSITION + indices into one BIN chunk,
-  //     and record bufferView/accessor offsets as we go (4-byte aligned). The
-  //     node's TRS matrix carries the object transform (glTF-idiomatic), so the
-  //     file re-opens with the same hierarchy instead of double-transforming.
+  // --- Concatenate every object's LOCAL geometry into one BIN chunk. The node's
+  //     TRS matrix carries the object transform (glTF-idiomatic), so the file
+  //     re-opens with the same hierarchy instead of double-transforming.
   const binParts: Uint8Array[] = [];
   let cursor = 0;
+  const pushView = (bytes: Uint8Array) => {
+    const view = bufferViews.length;
+    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: bytes.length });
+    binParts.push(bytes);
+    cursor = align4(cursor + bytes.length);
+    return view;
+  };
+
   objects.forEach((obj) => {
     const tris = triangulate(obj.mesh!.faces);
     if (tris.length === 0) return;
-    const verts = obj.mesh!.vertices;
+    const src = obj.mesh!.vertices;
+
+    // One vertex per triangle corner: position + flat normal (hard edges), which
+    // is exactly how the viewport shades the scene.
+    const pos: number[] = [];
+    const nrm: number[] = [];
+    for (const f of tris) {
+      const a = src[f[0]];
+      const b = src[f[1]];
+      const c = src[f[2]];
+      const n = faceNormal(a, b, c);
+      pos.push(...a, ...b, ...c);
+      nrm.push(...n, ...n, ...n);
+    }
+    const vertCount = pos.length / 3;
     const idx: number[] = [];
-    for (const f of tris) idx.push(f[0], f[1], f[2]);
-    const maxIdx = idx.length ? Math.max(...idx) : 0;
-    const comp = maxIdx < 65536 ? 5123 : 5125;
+    for (let i = 0; i < vertCount; i++) idx.push(i);
 
-    const posBytes = new Uint8Array(new Float32Array(verts.flat()).buffer);
-    const idxBytes =
-      comp === 5123 ? new Uint8Array(new Uint16Array(idx).buffer) : new Uint8Array(new Uint32Array(idx).buffer);
+    const posBytes = new Uint8Array(new Float32Array(pos).buffer);
+    const nrmBytes = new Uint8Array(new Float32Array(nrm).buffer);
+    const idxBytes = new Uint8Array(new Uint16Array(idx).buffer);
 
-    const posView = bufferViews.length;
-    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: posBytes.length });
-    binParts.push(posBytes);
-    cursor = align4(cursor + posBytes.length);
+    const posView = pushView(posBytes);
+    const nrmView = pushView(nrmBytes);
+    const idxView = pushView(idxBytes);
 
-    const idxView = bufferViews.length;
-    bufferViews.push({ buffer: 0, byteOffset: cursor, byteLength: idxBytes.length });
-    binParts.push(idxBytes);
-    cursor = align4(cursor + idxBytes.length);
-
+    const xs = [], ys = [], zs = [];
+    for (let i = 0; i < pos.length; i += 3) {
+      xs.push(pos[i]);
+      ys.push(pos[i + 1]);
+      zs.push(pos[i + 2]);
+    }
     const posAcc = accessors.length;
     accessors.push({
       bufferView: posView,
       componentType: 5126,
-      count: verts.length,
+      count: vertCount,
       type: "VEC3",
-      min: [
-        Math.min(...verts.map((v) => v[0])),
-        Math.min(...verts.map((v) => v[1])),
-        Math.min(...verts.map((v) => v[2])),
-      ],
-      max: [
-        Math.max(...verts.map((v) => v[0])),
-        Math.max(...verts.map((v) => v[1])),
-        Math.max(...verts.map((v) => v[2])),
-      ],
+      min: [Math.min(...xs), Math.min(...ys), Math.min(...zs)],
+      max: [Math.max(...xs), Math.max(...ys), Math.max(...zs)],
     });
+    const nrmAcc = accessors.length;
+    accessors.push({ bufferView: nrmView, componentType: 5126, count: vertCount, type: "VEC3" });
     const idxAcc = accessors.length;
-    accessors.push({
-      bufferView: idxView,
-      componentType: comp,
-      count: idx.length,
-      type: "SCALAR",
+    accessors.push({ bufferView: idxView, componentType: 5123, count: idx.length, type: "SCALAR" });
+
+    const matId = materials.length;
+    materials.push({
+      name: `${obj.name}_mat`,
+      pbrMetallicRoughness: {
+        baseColorFactor: [...hexToRgb(obj.color ?? "#e0e0e0"), 1],
+        metallicFactor: 0.0,
+        roughnessFactor: 1.0,
+      },
     });
 
     const meshId = meshDefs.length;
     const nodeId = nodes.length;
     meshDefs.push({
       name: obj.name,
-      primitives: [{ attributes: { POSITION: posAcc }, indices: idxAcc, mode: 4, material: 0 }],
+      primitives: [
+        {
+          attributes: { POSITION: posAcc, NORMAL: nrmAcc },
+          indices: idxAcc,
+          mode: 4,
+          material: matId,
+        },
+      ],
     });
     nodes.push({ name: obj.name, mesh: meshId, matrix: sceneObjectMatrix(obj) });
     nodeOrder.push(nodeId);
@@ -421,16 +461,7 @@ export function exportGlb(scene: Scene, opts: GlbOptions = {}): Uint8Array {
     accessors,
     bufferViews,
     buffers: [{ byteLength: bin.length }],
-    materials: [
-      {
-        name: "Material",
-        pbrMetallicRoughness: {
-          baseColorFactor: [0.8, 0.8, 0.8, 1],
-          metallicFactor: 0.08,
-          roughnessFactor: 0.82,
-        },
-      },
-    ],
+    materials,
   };
   const jsonBytes = new TextEncoder().encode(JSON.stringify(json));
   const jsonPad = align4(jsonBytes.length) - jsonBytes.length;
