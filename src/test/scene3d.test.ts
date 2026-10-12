@@ -54,6 +54,13 @@ import {
   uniqueName,
   v3,
   meshVertexNormals,
+  animationEndFrame,
+  emptyTrack,
+  evaluateObjectAnim,
+  evaluateScene,
+  evaluateTrack,
+  insertKey,
+  insertKeyframe,
   type Vec3,
   type BrushKind,
 } from "@/lib/scene3d";
@@ -667,5 +674,62 @@ describe("brush kinds", () => {
   it("lists every sculpting brush", () => {
     expect(BRUSH_KINDS).toHaveLength(5);
     expect(BRUSH_KINDS).toContain("draw");
+  });
+});
+
+// ---- Animation: Blender-style keyframes, tracks and playback evaluation ----
+describe("animation keyframes", () => {
+  it("insertKey keeps frames sorted and replaces the value at the same frame", () => {
+    let o = insertKey(createMeshObject("cube", "Cube"), "pos", 24, v3(1, 0, 0));
+    o = insertKey(o, "pos", 0, v3(0, 0, 0));
+    o = insertKey(o, "pos", 12, v3(0.5, 0, 0));
+    expect(o.anim!.pos!.frames).toEqual([0, 12, 24]);
+    o = insertKey(o, "pos", 12, v3(9, 9, 9));
+    expect(o.anim!.pos!.frames).toEqual([0, 12, 24]);
+    expect(o.anim!.pos!.values[1]).toEqual([9, 9, 9]);
+  });
+
+  it("evaluateTrack clamps at the ends and smooths in between", () => {
+    const base = { frames: [0, 24], values: [v3(0, 0, 0), v3(0, 12, 0)] };
+    const smooth = evaluateTrack({ ...base, interpolation: "smooth" }, 12)!;
+    // smoothstep(0.5) = 0.5 → Y lands exactly halfway.
+    expect(smooth[1]).toBeCloseTo(6, 6);
+    expect(evaluateTrack({ ...base, interpolation: "linear" }, -3)).toEqual([0, 0, 0]);
+    expect(evaluateTrack({ ...base, interpolation: "linear" }, 99)).toEqual([0, 12, 0]);
+    expect(emptyTrack().frames).toEqual([]);
+  });
+
+  it("evaluateObjectAnim falls back to the rest pose per channel", () => {
+    const cube = createMeshObject("cube", "Cube");
+    const keyed = insertKey(cube, "pos", 4, v3(1, 2, 3));
+    const t = evaluateObjectAnim(keyed, 10);
+    expect(t.position).toEqual([1, 2, 3]);
+    expect(t.rotation).toEqual(cube.transform.rotation);
+    expect(t.scale).toEqual(cube.transform.scale);
+  });
+
+  it("evaluateScene keeps the same reference when nothing is animated", () => {
+    const scene = createDemoScene();
+    expect(evaluateScene(scene, 30)).toBe(scene);
+  });
+
+  it("evaluateScene moves objects at a frame and animationEndFrame reports the end", () => {
+    const scene = createDemoScene();
+    const id = scene.objects[0].id;
+    let s = insertKeyframe(scene, id, "pos", 0, v3(0, 0, 0));
+    s = insertKeyframe(s, id, "pos", 48, v3(5, 5, 5));
+    const ev = evaluateScene(s, 24);
+    expect(ev).not.toBe(s);
+    expect(findObject(ev, id)!.transform.position[0]).toBeCloseTo(2.5, 5);
+    expect(animationEndFrame(s)).toBe(48);
+    expect(animationEndFrame(scene)).toBe(0);
+  });
+
+  it("round-trips keyframes through serialization", () => {
+    const scene = createDemoScene();
+    const id = scene.objects[0].id;
+    const s = insertKeyframe(scene, id, "rot", 4, v3(90, 0, 0));
+    const restored = deserializeScene(serializeScene(s));
+    expect(findObject(restored, id)!.anim?.rot?.frames).toEqual([4]);
   });
 });
