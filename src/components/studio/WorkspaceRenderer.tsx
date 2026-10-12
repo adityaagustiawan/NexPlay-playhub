@@ -14,6 +14,8 @@ import { ImageEditor } from "@/components/studio/ImageEditor";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
 import { GamePreview } from "@/components/GamePreview";
+import { GameView, type GameStatus } from "@/components/studio/GameView";
+import { Play } from "lucide-react";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
 import type { SceneObject } from "@/lib/scene3d";
@@ -91,6 +93,16 @@ interface LayoutProps {
   modeBar?: ReactNode;
   /** Flyout opened by the toolbar's Add tool. */
   addMenu?: ReactNode;
+  /** Unity-style Game view: set status to "playing"/"paused" to swap the
+   * viewport for a live run of the game (Play mode). */
+  game?: {
+    status: GameStatus;
+    pkg: GamePackage;
+    title?: string;
+    onStatusChange: (s: GameStatus) => void;
+    maximized: boolean;
+    onToggleMaximized: () => void;
+  };
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -131,6 +143,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     onToggleObjectVisible,
     modeBar,
     addMenu,
+    game,
   } = props;
 
   const RenderViewport = (key: string) => (
@@ -169,35 +182,59 @@ export function WorkspaceRenderer(props: LayoutProps) {
           </div>
           {modeBar}
           <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
-            {showToolbar && (
-              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-                {tools.map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
-                      <button
-                        type="button"
-                        title={t.label}
-                        onClick={() => (t.action ? t.action() : setTool(t.label))}
-                        className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                    </Tip>
-                  );
-                })}
-                {addMenu}
-              </div>
+            {game && game.status !== "stopped" ? (
+              <GameView
+                pkg={game.pkg}
+                title={game.title}
+                status={game.status}
+                onChange={game.onStatusChange}
+                maximized={game.maximized}
+                onToggleMaximized={game.onToggleMaximized}
+              />
+            ) : (
+              <>
+                {showToolbar && (
+                  <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                    {tools.map((t) => {
+                      const Icon = t.icon;
+                      return (
+                        <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
+                          <button
+                            type="button"
+                            title={t.label}
+                            onClick={() => (t.action ? t.action() : setTool(t.label))}
+                            className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </button>
+                        </Tip>
+                      );
+                    })}
+                    {addMenu}
+                  </div>
+                )}
+                <div className={`pointer-events-none absolute top-2 z-10 text-[11px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
+                  (1) Scene Collection | {editMode}
+                </div>
+                <div className={`pointer-events-none absolute bottom-2 z-10 text-[11px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
+                  {dimension === "3d"
+                    ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel or pinch: zoom"
+                    : `${config.mode} view · ${dimension.toUpperCase()}`}
+                </div>
+                {RenderViewport(`${dimension}-${nonce}`)}
+                {game && (
+                  <button
+                    type="button"
+                    title="Play the game in the viewport (Ctrl+P)"
+                    onClick={() => game.onStatusChange("playing")}
+                    className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-[#4772b3] px-2.5 py-1 font-body text-[11px] font-medium text-white shadow-lg transition-opacity hover:opacity-90"
+                  >
+                    <Play className="h-3 w-3" fill="currentColor" />
+                    Play
+                  </button>
+                )}
+              </>
             )}
-            <div className={`pointer-events-none absolute top-2 z-10 text-[11px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
-              (1) Scene Collection | {editMode}
-            </div>
-            <div className={`pointer-events-none absolute bottom-2 z-10 text-[11px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
-              {dimension === "3d"
-                ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel or pinch: zoom"
-                : `${config.mode} view · ${dimension.toUpperCase()}`}
-            </div>
-            {RenderViewport(`${dimension}-${nonce}`)}
           </div>
           <Timeline />
         </div>
@@ -240,27 +277,51 @@ export function WorkspaceRenderer(props: LayoutProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       {modeBar}
       <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
-        {showToolbar && (
-          <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-            {tools.map((t) => {
-              const Icon = t.icon;
-              return (
-                <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
-                  <button
-                    type="button"
-                    title={t.label}
-                    onClick={() => (t.action ? t.action() : setTool(t.label))}
-                    className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </button>
-                </Tip>
-              );
-            })}
-            {addMenu}
-          </div>
+        {game && game.status !== "stopped" ? (
+          <GameView
+            pkg={game.pkg}
+            title={game.title}
+            status={game.status}
+            onChange={game.onStatusChange}
+            maximized={game.maximized}
+            onToggleMaximized={game.onToggleMaximized}
+          />
+        ) : (
+          <>
+            {showToolbar && (
+              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                {tools.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
+                      <button
+                        type="button"
+                        title={t.label}
+                        onClick={() => (t.action ? t.action() : setTool(t.label))}
+                        className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    </Tip>
+                  );
+                })}
+                {addMenu}
+              </div>
+            )}
+            {RenderViewport(`${dimension}-${nonce}`)}
+            {game && (
+              <button
+                type="button"
+                title="Play the game in the viewport (Ctrl+P)"
+                onClick={() => game.onStatusChange("playing")}
+                className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-[#4772b3] px-2.5 py-1 font-body text-[11px] font-medium text-white shadow-lg transition-opacity hover:opacity-90"
+              >
+                <Play className="h-3 w-3" fill="currentColor" />
+                Play
+              </button>
+            )}
+          </>
         )}
-        {RenderViewport(`${dimension}-${nonce}`)}
       </div>
       {workspace === "Animation" ? (
         <div className="flex min-h-[160px] max-h-[260px] shrink-0 flex-col border-t border-black">

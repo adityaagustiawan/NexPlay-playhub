@@ -17,6 +17,8 @@ export interface GameInstance {
   destroy(): void;
   submitScore(score: number): void;
   getState(): GameState;
+  /** Pause or resume the simulation (Unity-style play mode). */
+  setPaused(paused: boolean): void;
 }
 
 export interface GameState {
@@ -106,6 +108,7 @@ export function mountGame(
   let lastShot = 0;
   let message = "";
   let messageUntil = 0;
+  let paused = false;
 
   const UP = new Set(["ArrowUp", "w", "W", " "]);
   const DOWN = new Set(["ArrowDown", "s", "S"]);
@@ -540,6 +543,23 @@ export function mountGame(
     },
     submitScore(score: number) {
       state.score = score;
+    },
+    setPaused(p: boolean) {
+      if (p === paused) return;
+      paused = p;
+      if (p) {
+        // Freeze the simulation: drop held keys and stop the render loop so the
+        // last frame stays on screen (like Unity's pause button).
+        clearKeys();
+        cancelAnimationFrame(rafId);
+      } else {
+        // Resume cleanly: reset clock anchors so the next frame has a sane dt
+        // and spawning doesn't burst after a long pause.
+        last = performance.now();
+        lastSpawn = last;
+        lastShot = last;
+        rafId = requestAnimationFrame(loop);
+      }
     },
     getState() {
       return { ...state };
