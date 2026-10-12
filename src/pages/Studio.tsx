@@ -260,6 +260,11 @@ const Studio = () => {
   const [nonce, setNonce] = useState(0);
   const [museActivity, setMuseActivity] = useState<string | null>(null);
 
+  // Unity-style Game view: Play (Ctrl+P) swaps the viewport for a live run of
+  // the built game with a Play/Pause/Stop transport.
+  const [gameStatus, setGameStatus] = useState<"stopped" | "playing" | "paused">("stopped");
+  const [gameMaximized, setGameMaximized] = useState(false);
+
   // Resizable panel sizes (persisted between sessions).
   const [museWidth, setMuseWidth] = useStoredNumber("nexstudio_muse_w", 340);
   const [panelWidth, setPanelWidth] = useStoredNumber("nexstudio_panel_w", 320);
@@ -519,6 +524,14 @@ const Studio = () => {
   useEffect(() => {
     if (config.dimension !== "3d") setCameraPov(false);
   }, [config.dimension]);
+
+  /** Unity's Play/Pause toggle (Ctrl+P) — starts a run, or pauses/resumes it. */
+  const toggleGamePlay = useCallback(() => {
+    setGameStatus((s) => (s === "stopped" ? "playing" : s === "playing" ? "paused" : "playing"));
+  }, []);
+
+  /** Stop the run and return to the scene view (Esc / Stop). */
+  const stopGame = useCallback(() => setGameStatus("stopped"), []);
 
   /** POV mode: move the active camera by a world-space delta. */
   const moveActiveCamera = useCallback((delta: Vec3) => {
@@ -938,7 +951,26 @@ const Studio = () => {
       );
     };
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTyping(e.target)) return;
+      // Blender numpad views with a modifier — Ctrl+1 back, Ctrl+3 left,
+      // Ctrl+7 bottom (plain 1/3/7 are front/right/top below), Ctrl+0 camera.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && ["1", "3", "7", "0"].includes(e.key)) {
+        e.preventDefault();
+        if (e.key === "1") viewportRef.current?.setView("back");
+        else if (e.key === "3") viewportRef.current?.setView("left");
+        else if (e.key === "7") viewportRef.current?.setView("bottom");
+        else toggleCameraPov();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // While playing, hand every key to the game except Escape (stop).
+      if (gameStatus !== "stopped") {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          stopGame();
+        }
+        return;
+      }
       if (e.key === "F3") {
         e.preventDefault();
         setOperatorOpen((v) => !v);
@@ -953,7 +985,7 @@ const Studio = () => {
           return;
         }
         const brushKey: Record<string, string> = { x: "draw", s: "smooth", g: "grab", i: "inflate" };
-        if (!e.ctrlKey && !e.metaKey && !e.altKey && brushKey[k]) {
+        if (brushKey[k]) {
           e.preventDefault();
           setBrush(brushKey[k]);
           return;
@@ -979,12 +1011,38 @@ const Studio = () => {
         duplicateSelectionAction();
         return;
       }
+      // Blender Shift+C — snap the 3D cursor back to the world origin.
+      if (e.shiftKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        setCursor(v3(0, 0, 0));
+        setNotice("3D cursor snapped to world origin (Shift+C).");
+        return;
+      }
       switch (e.key) {
         case "t":
           setShowToolbar((v) => !v);
           break;
         case "n":
           setShowPanels((v) => !v);
+          break;
+        case "b":
+          setTool("Select Box");
+          break;
+        case "g":
+          // Blender G — grab: switch to the Move tool.
+          setTool("Move");
+          break;
+        case "r":
+          setTool("Rotate");
+          break;
+        case "s":
+          setTool("Scale");
+          break;
+        case "m":
+          setTool("Measure");
+          break;
+        case "d":
+          setTool("Annotate");
           break;
         case "1":
           viewportRef.current?.setView("front");
@@ -997,6 +1055,22 @@ const Studio = () => {
           break;
         case "0":
           toggleCameraPov();
+          break;
+        case "z":
+          // Blender Z: toggle solid ⇄ wireframe viewport shading.
+          setShading((s) => (s === "solid" ? "wire" : "solid"));
+          break;
+        case "e":
+          // Blender E: extrude/offset the selected vertices in Edit Mode.
+          if (modeKey === "edit" && selectedVertices.length > 0) {
+            e.preventDefault();
+            duplicateSelectedVertices(v3(0, 0.55, 0));
+          }
+          break;
+        case "Delete":
+        case "Backspace":
+          e.preventDefault();
+          deleteSelection();
           break;
         case "Home":
           viewportRef.current?.frameAll();
@@ -1015,7 +1089,7 @@ const Studio = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.dimension, deleteSelection, duplicateSelectionAction, modeKey, selectAllVertices, toggleCameraPov]);
+  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, selectAllVertices, stopGame, toggleCameraPov]);
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -1032,12 +1106,16 @@ const Studio = () => {
       } else if (k === "n") {
         e.preventDefault();
         newGame();
+      } else if (k === "p") {
+        // Unity play mode: Ctrl+P toggles play/pause in the viewport.
+        e.preventDefault();
+        toggleGamePlay();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, record, busy, isOwner, user]);
+  }, [config, record, busy, isOwner, user, toggleGamePlay]);
 
   const iconBtn = (on?: boolean) =>
     `flex h-7 w-7 items-center justify-center rounded-[3px] ${
@@ -1075,6 +1153,18 @@ const Studio = () => {
           label: "Play in new tab",
           onSelect: record ? () => window.open(`/play/${record.game_key}`, "_blank") : undefined,
           disabled: !record,
+        },
+        { separator: true },
+        {
+          label:
+            gameStatus === "stopped" ? "Play in viewport" : gameStatus === "paused" ? "Resume (Ctrl+P)" : "Pause (Ctrl+P)",
+          shortcut: "Ctrl+P",
+          onSelect: toggleGamePlay,
+        },
+        {
+          label: "Stop playing",
+          onSelect: stopGame,
+          disabled: gameStatus === "stopped",
         },
         { separator: true },
         { label: "Exit to NexConsole", onSelect: () => navigate("/create") },
@@ -1308,6 +1398,9 @@ const Studio = () => {
             </span>
             <span className="tabular-nums text-[#8f8f8f]">{selectedVertices.length} selected</span>
             <span className="mx-1 h-3.5 w-px bg-[#3d3d3d]" />
+            <button type="button" title="Extrude the selected vertices along Y (E)" onClick={() => duplicateSelectedVertices(v3(0, 0.55, 0))} className="rounded-[3px] px-1.5 py-0.5 hover:bg-[#3a3a3a]">
+              Extrude
+            </button>
             <button type="button" title="Duplicate the selected vertices (Shift+D)" onClick={() => duplicateSelectedVertices()} className="rounded-[3px] px-1.5 py-0.5 hover:bg-[#3a3a3a]">
               Duplicate
             </button>
@@ -1802,6 +1895,14 @@ const Studio = () => {
             onToggleObjectVisible={toggleObjectVisible}
             modeBar={modeBar}
             addMenu={addMenuFlyout}
+            game={{
+              status: gameStatus,
+              pkg,
+              title: config.title,
+              onStatusChange: setGameStatus,
+              maximized: gameMaximized,
+              onToggleMaximized: () => setGameMaximized((v) => !v),
+            }}
             panelWidth={panelWidth}
             setPanelWidth={setPanelWidth}
             outlinerHeight={outlinerHeight}
