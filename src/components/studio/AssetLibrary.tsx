@@ -5,8 +5,8 @@
 // on GitHub. "Add" downloads the .glb, parses it (importGlb) and hands the
 // meshes to the scene as grounded objects.
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
-import { importGlb, type ImportedMesh } from "@/lib/gltf";
+import { Download, FileDown, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
+import { downloadBlob, importGlb, type ImportedMesh } from "@/lib/gltf";
 
 interface RemoteAsset {
   id: string;
