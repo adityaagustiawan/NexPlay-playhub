@@ -10,6 +10,7 @@ import { Timeline } from "@/components/studio/Timeline";
 import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
 import { NodeEditor } from "@/components/studio/NodeEditor";
+import { ImageEditor } from "@/components/studio/ImageEditor";
 import { SpriteEditor } from "./SpriteEditor";
 import { Viewport2D } from "./Viewport2D";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
@@ -19,6 +20,9 @@ import { GamePreview } from "@/components/GamePreview";
 import { GameView, type GameStatus } from "@/components/studio/GameView";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
+import type { GameRecord } from "@/engine/gameLoader";
+import type { StudioConfig } from "@/lib/studioConfig";
+import type { LucideIcon } from "lucide-react";
 import type { SceneObject } from "@/lib/scene3d";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode, RefObject } from "react";
@@ -57,9 +61,9 @@ export interface ViewportSceneProps {
 
 interface LayoutProps {
   workspace: Workspace;
-  config: any;
+  config: StudioConfig;
   pkg: GamePackage;
-  record?: any | null;
+  record?: GameRecord | null;
   dimension: "2d" | "3d";
   nonce: number;
   selected: OutlinerKey;
@@ -74,9 +78,9 @@ interface LayoutProps {
   tool: string;
   setTool: (t: string) => void;
   shading: string;
-  headerMenus: { label: string; items: any[] }[];
+  headerMenus: { label: string; items: StudioMenuEntry[] }[];
   headerMenusRender: () => ReactNode;
-  tools: { icon: any; label: string; tip?: string; shortcut?: string; action?: () => void }[];
+  tools: { icon: LucideIcon; label: string; tip?: string; shortcut?: string; action?: () => void }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
   /** Optional drag-&-drop import handlers attached to the 3D viewport body. */
@@ -127,10 +131,19 @@ interface LayoutProps {
   // 2D editor props
   scene2d: import("@/lib/scene2d").Scene2D;
   onScene2dChange: (patch: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  /** Structural change or end-of-drag — pushes one undo step. */
+  onScene2dCommit: (patch?: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  tool2d: import("@/lib/scene2d").Tool2D;
+  onTool2dChange: (t: import("@/lib/scene2d").Tool2D) => void;
+  localSpace2d: boolean;
+  onLocalSpace2dChange: (v: boolean) => void;
+  onSelect2d: (id: string | null) => void;
+  onSelectMany2d: (ids: string[]) => void;
+  onDeleteSelected2d: () => void;
   canUndo2d: boolean;
   canRedo2d: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
+  onUndo2d: () => void;
+  onRedo2d: () => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -187,6 +200,20 @@ export function WorkspaceRenderer(props: LayoutProps) {
     onInsertKeyframe,
     autoKey,
     onToggleAutoKey,
+    scene2d,
+    onScene2dChange,
+    onScene2dCommit,
+    tool2d,
+    onTool2dChange,
+    localSpace2d,
+    onLocalSpace2dChange,
+    onSelect2d,
+    onSelectMany2d,
+    onDeleteSelected2d,
+    canUndo2d,
+    canRedo2d,
+    onUndo2d,
+    onRedo2d,
   } = props;
 
   /** The Timeline at home in every workspace that shows a bottom strip. */
@@ -211,12 +238,20 @@ export function WorkspaceRenderer(props: LayoutProps) {
         <Viewport3D ref={viewportRef} {...viewport} />
       ) : (
         <SpriteEditor
-          scene={props.scene2d}
-          onChange={props.onScene2dChange}
-          canUndo={props.canUndo2d}
-          canRedo={props.canRedo2d}
-          onUndo={props.onUndo}
-          onRedo={props.onRedo}
+          scene={scene2d}
+          tool={tool2d}
+          onToolChange={onTool2dChange}
+          localSpace={localSpace2d}
+          onLocalSpaceChange={onLocalSpace2dChange}
+          onChange={onScene2dChange}
+          onCommit={onScene2dCommit}
+          onSelect={onSelect2d}
+          onSelectMany={onSelectMany2d}
+          onDeleteSelected={onDeleteSelected2d}
+          canUndo={canUndo2d}
+          canRedo={canRedo2d}
+          onUndo={onUndo2d}
+          onRedo={onRedo2d}
         />
       )}
     </div>
@@ -404,14 +439,26 @@ export function WorkspaceRenderer(props: LayoutProps) {
         </div>
       ) : workspace === "Shading" ? (
         <div className="flex h-[200px] shrink-0 border-t border-black">
-          <SpriteEditor
-            scene={props.scene2d}
-            onChange={props.onScene2dChange}
-            canUndo={props.canUndo2d}
-            canRedo={props.canRedo2d}
-            onUndo={props.onUndo}
-            onRedo={props.onRedo}
-          />
+          {dimension === "2d" ? (
+            <SpriteEditor
+              scene={scene2d}
+              tool={tool2d}
+              onToolChange={onTool2dChange}
+              localSpace={localSpace2d}
+              onLocalSpaceChange={onLocalSpace2dChange}
+              onChange={onScene2dChange}
+              onCommit={onScene2dCommit}
+              onSelect={onSelect2d}
+              onSelectMany={onSelectMany2d}
+              onDeleteSelected={onDeleteSelected2d}
+              canUndo={canUndo2d}
+              canRedo={canRedo2d}
+              onUndo={onUndo2d}
+              onRedo={onRedo2d}
+            />
+          ) : (
+            <ImageEditor />
+          )}
         </div>
       ) : (
         timelineFor("timeline-other")

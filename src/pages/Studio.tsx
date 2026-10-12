@@ -29,8 +29,11 @@ import {
   createScene2D,
   serializeScene2D,
   deserializeScene2D,
+  removeObject as removeObject2d,
+  selectMany as selectMany2d,
   type Scene2D,
 } from "@/lib/scene2d";
+import { TOOL_LABELS, type Tool2D } from "@/lib/scene2d";
 import { Viewport3D, type Viewport3DHandle, type ViewportShading } from "@/components/studio/Viewport3D";
 import {
   activeCamera,
@@ -291,12 +294,15 @@ const Studio = () => {
   const animPlayingRef = useRef(false);
   const autoKeyRef = useRef(true);
 
-  // ---- 2D scene (game asset editor) ----
+  // ---- 2D scene (Godot-style game asset editor) ----
   const [scene2d, setScene2d] = useState<Scene2D>(() => createScene2D());
   const [scene2dHistory, setScene2dHistory] = useState<string[]>([serializeScene2D(createScene2D())]);
   const [scene2dFuture, setScene2dFuture] = useState<string[]>([]);
   const canUndo2d = scene2dHistory.length > 1;
   const canRedo2d = scene2dFuture.length > 0;
+  /** Godot 2D toolbar state. */
+  const [tool2d, setTool2d] = useState<Tool2D>("select");
+  const [localSpace2d, setLocalSpace2d] = useState(true);
 
   const pushSceneHistory = useCallback(
     (next: Scene, replace = false) => {
@@ -324,6 +330,23 @@ const Studio = () => {
       if (!replace) setScene2dFuture([]);
     },
     [],
+  );
+
+  /** Live view/transform update — Godot does not undo camera moves. */
+  const editScene2d = useCallback((patch: (s: Scene2D) => Scene2D) => {
+    setScene2d((s) => patch(s));
+  }, []);
+
+  /** Structural change (or end of a drag) — one undo step per drag. */
+  const commitScene2d = useCallback(
+    (patch?: (s: Scene2D) => Scene2D) => {
+      setScene2d((s) => {
+        const next = patch ? patch(s) : s;
+        pushScene2dHistory(next);
+        return next;
+      });
+    },
+    [pushScene2dHistory],
   );
 
   const undo = useCallback(() => {
@@ -464,10 +487,18 @@ const Studio = () => {
         setSceneHistory([serializeScene(createDemoScene())]);
         setSceneFuture([]);
       }
-      // 2D scene reset on load (optional: could extend studio_data later)
-      setScene2d(createScene2D());
-      setScene2dHistory([serializeScene2D(createScene2D())]);
-      setScene2dFuture([]);
+      // Restore the 2D canvas (nodes, transforms, grid, snap and view state).
+      const storedScene2d = (rec.studio_data?.scene2d as string | undefined) ?? null;
+      if (storedScene2d) {
+        const restored2d = deserializeScene2D(storedScene2d);
+        setScene2d(restored2d);
+        setScene2dHistory([storedScene2d]);
+        setScene2dFuture([]);
+      } else {
+        setScene2d(createScene2D());
+        setScene2dHistory([serializeScene2D(createScene2D())]);
+        setScene2dFuture([]);
+      }
       setAnimFrame(0);
       setAnimPlaying(false);
       setLoading(false);
@@ -1094,7 +1125,14 @@ const Studio = () => {
       const title = opts?.title ?? config.title;
       const gameplay = buildGameplay(config);
       const assets = { palette: "custom", generatedBy: "nexstudio", prompt: config.description };
-      const studioData = { source: "nexstudio", editedAt: new Date().toISOString(), scene: serializeScene(scene) };
+      const studioData = {
+        source: "nexstudio",
+        editedAt: new Date().toISOString(),
+        scene: serializeScene(scene),
+        // The 2D canvas is persisted too, so Godot-style work survives reloads.
+        scene2d: serializeScene2D(scene2d),
+        dimension: config.dimension,
+      };
 
       if (record && !opts?.asNew) {
         const alreadyReleased = Boolean(record.released_at);
@@ -1361,6 +1399,17 @@ const Studio = () => {
     };
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target)) return;
+      const targetEl = e.target as HTMLElement | null;
+      const in2d =
+        config.dimension === "2d" &&
+        (targetEl?.closest?.("[data-2d-viewport]") != null ||
+          (document.activeElement instanceof HTMLElement && document.activeElement.closest("[data-2d-viewport]") != null));
+      // The 2D canvas owns Godot's keymap (Q/W/E/S/R/G, F, Y, H, zoom, arrows,
+      // numpad grid multiplier). Only the shared shortcuts reach the 3D map.
+      if (in2d && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const owned = ["q", "w", "e", "s", "r", "g", "f", "y", "h", "z", "x", "delete", "backspace", "*", "/", "arrowleft", "arrowright", "arrowup", "arrowdown", "1", "3", "7", "0"];
+        if (owned.includes(e.key.toLowerCase())) return;
+      }
       // Blender numpad views with a modifier — Ctrl+1 back, Ctrl+3 left,
       // Ctrl+7 bottom (plain 1/3/7 are front/right/top below), Ctrl+0 camera.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && ["1", "3", "7", "0"].includes(e.key)) {
@@ -1491,15 +1540,6 @@ const Studio = () => {
             duplicateSelectedVertices(v3(0, 0.55, 0));
           }
           break;
-        case "z":
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            if (e.shiftKey) redo();
-            else undo();
-            return;
-          }
-          setShading((s) => (s === "solid" ? "wire" : "solid"));
-          break;
         case "Delete":
         case "Backspace":
           e.preventDefault();
@@ -1544,6 +1584,31 @@ const Studio = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, jumpKeyframe, selectAllVertices, stopGame, toggleCameraPov, undo, redo]);
 
+  // ---- 2D editor actions (Godot 2D canvas) ----
+  const selectedIds2d = useCallback(
+    () => (scene2d.selectedIds?.length ? scene2d.selectedIds : scene2d.selectedId ? [scene2d.selectedId] : []),
+    [scene2d],
+  );
+
+  const deleteSelected2d = useCallback(() => {
+    const ids = selectedIds2d();
+    if (!ids.length) return;
+    commitScene2d((s) => {
+      let next = s;
+      for (const id of ids) next = removeObject2d(next, id);
+      return { ...next, selectedId: null, selectedIds: [] };
+    });
+    setNotice(`Deleted ${ids.length} 2D node${ids.length === 1 ? "" : "s"}.`);
+  }, [commitScene2d, selectedIds2d]);
+
+  const select2d = useCallback((id: string | null) => {
+    setScene2d((s) => (id ? { ...s, selectedId: id, selectedIds: [id] } : { ...s, selectedId: null, selectedIds: [] }));
+  }, []);
+
+  const selectMany2dAction = useCallback((ids: string[]) => {
+    setScene2d((s) => selectMany2d(s, ids));
+  }, []);
+
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1563,6 +1628,11 @@ const Studio = () => {
         // Unity play mode: Ctrl+P toggles play/pause in the viewport.
         e.preventDefault();
         toggleGamePlay();
+      } else if (k === "z") {
+        // Undo / redo — works in both the 3D scene and the 2D canvas.
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1849,7 +1919,16 @@ const Studio = () => {
 
   /** Blender's brush/vertex strip under the header, per editing mode. */
   const modeBar =
-    config.dimension !== "3d" ? null : (
+    config.dimension === "2d" ? (
+      <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[#1d1d1d] bg-[#2b2b2b] px-2 text-[10px] text-[#b0b0b0]">
+        <span className="uppercase tracking-wide text-[#8a8a8a]">2D</span>
+        <span className="tabular-nums text-[#d6d6d6]">{TOOL_LABELS[tool2d].label}</span>
+        <span className="tabular-nums text-[#8f8f8f]">({TOOL_LABELS[tool2d].key}) {TOOL_LABELS[tool2d].hint}</span>
+        <span className="ml-auto text-[#8a8a8a]">
+          Space-drag or middle-drag pans · wheel scrolls · Ctrl+wheel zooms · Del deletes · right-click adds nodes
+        </span>
+      </div>
+    ) : config.dimension !== "3d" ? null : (
       <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[#1d1d1d] bg-[#2b2b2b] px-2 text-[10px] text-[#b0b0b0]">
         {modeKey === "sculpt" && (
           <>
@@ -2376,7 +2455,7 @@ const Studio = () => {
 
           {/* Workspace content */}
           <WorkspaceRenderer
-            workspace={workspace as any}
+            workspace={workspace as Workspace}
             config={config}
             pkg={pkg}
             record={record}
@@ -2448,11 +2527,19 @@ const Studio = () => {
             modeBar={modeBar}
             addMenu={addMenuFlyout}
             scene2d={scene2d}
-            onScene2dChange={(patch) => setScene2d((s) => { const ns = patch(s); pushScene2dHistory(ns); return ns; })}
+            onScene2dChange={editScene2d}
+            onScene2dCommit={commitScene2d}
+            tool2d={tool2d}
+            onTool2dChange={setTool2d}
+            localSpace2d={localSpace2d}
+            onLocalSpace2dChange={setLocalSpace2d}
+            onSelect2d={select2d}
+            onSelectMany2d={selectMany2dAction}
+            onDeleteSelected2d={deleteSelected2d}
             canUndo2d={canUndo2d}
             canRedo2d={canRedo2d}
-            onUndo={undo}
-            onRedo={redo}
+            onUndo2d={undo}
+            onRedo2d={redo}
             game={{
               status: gameStatus,
               pkg,
