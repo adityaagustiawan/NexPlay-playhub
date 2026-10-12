@@ -34,6 +34,7 @@ import {
   createDemoScene,
   createLight,
   createMeshObject,
+  createMeshObjectFromData,
   deleteVertices,
   deserializeScene,
   duplicateSelection,
@@ -54,6 +55,20 @@ import {
   type Scene,
   type Vec3,
 } from "@/lib/scene3d";
+import {
+  downloadBlob,
+  exportGlb,
+  exportObj,
+  exportStl,
+  importGlb,
+  importObj,
+  sceneMeshObjects,
+  type ImportedMesh,
+} from "@/lib/gltf";
+import { exportGamePng } from "@/lib/gameSnapshot";
+import { type StudioTemplate } from "@/lib/templates";
+import { AssetLibrary } from "@/components/studio/AssetLibrary";
+import { TemplatePickerDialog } from "@/components/studio/TemplatePickerDialog";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
@@ -102,6 +117,7 @@ import {
   Video,
   ZoomIn,
   ZoomOut,
+  Package,
 } from "lucide-react";
 
 const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "Scripting"];
@@ -168,6 +184,7 @@ const PROP_TABS: PropTab[] = [
   { id: "scene", label: "Scene", icon: Settings2 },
   { id: "world", label: "World", icon: Globe },
   { id: "object", label: "Object", icon: Box },
+  { id: "assets", label: "Assets", icon: Package },
 ];
 
 const inputCls =
@@ -257,6 +274,8 @@ const Studio = () => {
   const [showToolbar, setShowToolbar] = useState(true);
   const [showPanels, setShowPanels] = useState(true);
   const [operatorOpen, setOperatorOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [nonce, setNonce] = useState(0);
   const [museActivity, setMuseActivity] = useState<string | null>(null);
 
@@ -532,6 +551,96 @@ const Studio = () => {
 
   /** Stop the run and return to the scene view (Esc / Stop). */
   const stopGame = useCallback(() => setGameStatus("stopped"), []);
+
+  // ---- Asset import / export (real interchange formats) ---------------------
+
+  /** Adds a parsed model (or one of its meshes) to the scene, grounded. */
+  const addImportedMesh = useCallback((m: ImportedMesh) => {
+    setScene((s) => {
+      const obj = createMeshObjectFromData(uniqueName(s, m.name), m.mesh, v3(0, 0, 0), m.color);
+      return addObject(s, obj);
+    });
+    setNotice(`Added “${m.name}” to the scene.`);
+  }, []);
+
+  /** File ▸ Import Model: reads a .glb/.obj picked from disk into the scene. */
+  const importModelFile = useCallback(
+    async (file: File) => {
+      try {
+        if (file.name.toLowerCase().endsWith(".glb")) {
+          const buf = await file.arrayBuffer();
+          const meshes = importGlb(buf);
+          meshes.forEach(addImportedMesh);
+          setNotice(`Imported ${meshes.length} mesh${meshes.length === 1 ? "" : "es"} from ${file.name}.`);
+        } else if (file.name.toLowerCase().endsWith(".obj")) {
+          const text = await file.text();
+          const meshes = importObj(text);
+          meshes.forEach(addImportedMesh);
+          setNotice(`Imported ${file.name}.`);
+        } else {
+          setError("Unsupported file — drop a .glb or .obj model.");
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not import the model file.");
+      }
+    },
+    [addImportedMesh],
+  );
+
+  /** File ▸ Export As (3D): GLB / OBJ / STL — opens in Blender, Unity, printers. */
+  const exportCurrent3D = useCallback(
+    (format: "glb" | "obj" | "stl") => {
+      const base = slugify(config.title || "scene") || "scene";
+      try {
+        const count = sceneMeshObjects(scene).length;
+        if (format === "glb") {
+          downloadBlob(new Blob([exportGlb(scene, { name: base })], { type: "model/gltf-binary" }), `${base}.glb`);
+        } else if (format === "obj") {
+          downloadBlob(new Blob([exportObj(scene, base)], { type: "text/plain" }), `${base}.obj`);
+        } else {
+          downloadBlob(new Blob([exportStl(scene, base)], { type: "model/stl" }), `${base}.stl`);
+        }
+        setNotice(`Exported ${format.toUpperCase()} — ${count} mesh object${count === 1 ? "" : "s"}.`);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Export failed.");
+      }
+    },
+    [config.title, scene],
+  );
+
+  /** File ▸ Export As (2D): a rendered game frame (PNG) + gameplay JSON. */
+  const exportCurrent2D = useCallback(async () => {
+    const base = slugify(config.title || "game") || "game";
+    try {
+      const png = await exportGamePng(pkg, config.title);
+      downloadBlob(png, `${base}-frame.png`);
+      const gameplay = buildGameplay(config);
+      const json = JSON.stringify(
+        { platform: "nexplay", engine: "nexstudio", title: config.title, gameplay },
+        null,
+        2,
+      );
+      downloadBlob(new Blob([json], { type: "application/json" }), `${base}.gameplay.json`);
+      setNotice("Exported 2D game frame (PNG) + gameplay JSON. 3D games export GLB/OBJ/STL instead.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "2D export failed.");
+    }
+  }, [config, pkg]);
+
+  /** File ▸ New Game from Template: stamps a config (+ 3D starter scene). */
+  const applyTemplate = useCallback((tpl: StudioTemplate) => {
+    setTemplateOpen(false);
+    setParams({}, { replace: true });
+    setRecord(null);
+    setConfig(tpl.config());
+    if (tpl.scene) setScene(tpl.scene());
+    setSelected("game");
+    setEditMode("Object Mode");
+    setCameraPov(false);
+    setError(null);
+    setNotice(`Template “${tpl.label}” applied — edit it, then Save.`);
+    setNonce((n) => n + 1);
+  }, []);
 
   /** POV mode: move the active camera by a world-space delta. */
   const moveActiveCamera = useCallback((delta: Vec3) => {
@@ -895,6 +1004,32 @@ const Studio = () => {
       },
     },
     { id: "file.new", label: "File: New Game", hint: "Ctrl+N", run: newGame },
+    { id: "file.new.template", label: "File: New Game from Template…", run: () => setTemplateOpen(true) },
+    {
+      id: "file.import",
+      label: "File: Import Model… (.glb / .obj)",
+      run: () => importInputRef.current?.click(),
+    },
+    {
+      id: "file.export.glb",
+      label: "File: Export As ▸ GLB (.glb)",
+      run: () => exportCurrent3D("glb"),
+    },
+    {
+      id: "file.export.obj",
+      label: "File: Export As ▸ OBJ (.obj)",
+      run: () => exportCurrent3D("obj"),
+    },
+    {
+      id: "file.export.stl",
+      label: "File: Export As ▸ STL (.stl)",
+      run: () => exportCurrent3D("stl"),
+    },
+    {
+      id: "file.export.2d",
+      label: "File: Export As ▸ PNG frame + JSON",
+      run: () => void exportCurrent2D(),
+    },
     { id: "view.ai", label: "View: Toggle AI Assistant", hint: "A", run: () => setShowAIAssistant((v) => !v) },
     { id: "ai.muse", label: "Muse: Build / edit with AI", hint: "A", run: () => setShowAIAssistant(true) },
     { id: "view.front", label: "View: Front", hint: "1", run: () => viewportRef.current?.setView("front") },
@@ -1127,6 +1262,7 @@ const Studio = () => {
       label: "File",
       items: [
         { label: "New Game", shortcut: "Ctrl+N", onSelect: newGame },
+        { label: "New Game from Template…", onSelect: () => setTemplateOpen(true) },
         {
           label: "Open Game…",
           shortcut: "Ctrl+O",
@@ -1147,6 +1283,37 @@ const Studio = () => {
           label: "Save a copy…",
           onSelect: () => persist(false, { asNew: true, title: `${config.title} copy` }),
           disabled: busy || !user,
+        },
+        { separator: true },
+        {
+          label: "Import Model… (.glb / .obj)",
+          onSelect: () => importInputRef.current?.click(),
+        },
+        { section: "Export As" },
+        {
+          label: "GLB (.glb) — Blender / Unity",
+          onSelect: () => exportCurrent3D("glb"),
+          disabled: config.dimension !== "3d",
+        },
+        {
+          label: "OBJ (.obj) — Blender / Unity",
+          onSelect: () => exportCurrent3D("obj"),
+          disabled: config.dimension !== "3d",
+        },
+        {
+          label: "STL (.stl) — 3D printing",
+          onSelect: () => exportCurrent3D("stl"),
+          disabled: config.dimension !== "3d",
+        },
+        {
+          label: "PNG frame + gameplay JSON — 2D",
+          onSelect: () => void exportCurrent2D(),
+          disabled: config.dimension !== "2d",
+        },
+        {
+          label: config.dimension === "3d" ? "3D scene exports GLB·OBJ·STL" : "2D game exports PNG + JSON",
+          onSelect: undefined,
+          disabled: true,
         },
         { separator: true },
         {
@@ -1618,6 +1785,13 @@ const Studio = () => {
         );
       case "object":
         return objectFields();
+      case "assets":
+        return (
+          <AssetLibrary
+            onAddMesh={addImportedMesh}
+            onImportFile={() => importInputRef.current?.click()}
+          />
+        );
       case "render":
         return (
           <>
@@ -1977,6 +2151,21 @@ const Studio = () => {
       )}
 
       <OperatorSearch open={operatorOpen} operators={operators} onClose={() => setOperatorOpen(false)} />
+
+      {/* Hidden file input for File ▸ Import Model (.glb / .obj). */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".glb,.obj"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void importModelFile(file);
+          e.target.value = "";
+        }}
+      />
+
+      <TemplatePickerDialog open={templateOpen} onClose={() => setTemplateOpen(false)} onPick={applyTemplate} />
 
       {/* ---- First-run onboarding + build overlay ---- */}
       {showIntro && <StudioIntro firstRun={introFirstRun} onDone={finishIntro} />}
