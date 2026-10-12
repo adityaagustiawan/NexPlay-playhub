@@ -111,6 +111,7 @@ import {
   PenTool,
   Play,
   Plus,
+  Redo,
   RotateCw,
   Ruler,
   Save,
@@ -118,6 +119,7 @@ import {
   Sparkles,
   Square,
   Sun,
+  Undo,
   Upload,
   Video,
   ZoomIn,
@@ -260,6 +262,10 @@ const Studio = () => {
 
   // ---- 3D scene (the Blender-like editor) ----
   const [scene, setScene] = useState<Scene>(() => createDemoScene());
+  const [sceneHistory, setSceneHistory] = useState<string[]>([serializeScene(createDemoScene())]);
+  const [sceneFuture, setSceneFuture] = useState<string[]>([]);
+  const canUndo = sceneHistory.length > 1;
+  const canRedo = sceneFuture.length > 0;
   const [objectId, setObjectId] = useState<string | null>(null);
   const [selectedVertices, setSelectedVertices] = useState<number[]>([]);
   const [cameraPov, setCameraPov] = useState(false);
@@ -278,6 +284,44 @@ const Studio = () => {
   const animFrameRef = useRef(0);
   const animPlayingRef = useRef(false);
   const autoKeyRef = useRef(true);
+
+
+  const pushSceneHistory = useCallback(
+    (next: Scene, replace = false) => {
+      setSceneHistory((h) => {
+        const snap = serializeScene(next);
+        const prev = h[h.length - 1];
+        if (!replace && prev === snap) return h;
+        const nh = replace ? [...h.slice(0, -1), snap] : [...h, snap];
+        return nh.length > 100 ? nh.slice(nh.length - 100) : nh;
+      });
+      if (!replace) setSceneFuture([]);
+    },
+    [],
+  );
+
+  const undo = useCallback(() => {
+    if (sceneHistory.length <= 1) return;
+    const curSnap = serializeScene(scene);
+    const targetSnap = sceneHistory[sceneHistory.length - 2];
+    const restored = deserializeScene(targetSnap);
+    if (restored) setScene(restored);
+    setSceneHistory((h) => h.slice(0, -1));
+    setSceneFuture((f) => [curSnap, ...f].slice(0, 100));
+    setAnimFrame(0);
+    setObjectId(null);
+  }, [scene, sceneHistory]);
+
+  const redo = useCallback(() => {
+    if (sceneFuture.length === 0) return;
+    const curSnap = serializeScene(scene);
+    const targetSnap = sceneFuture[0];
+    const restored = deserializeScene(targetSnap);
+    if (restored) setScene(restored);
+    setSceneFuture((f) => f.slice(1));
+    setSceneHistory((h) => [...h, curSnap].slice(-100));
+    setAnimFrame(0);
+  }, [scene, sceneFuture]);
 
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
@@ -362,7 +406,14 @@ const Studio = () => {
       const storedScene = (rec.studio_data?.scene as string | undefined) ?? null;
       if (storedScene) {
         const restored = deserializeScene(storedScene);
-        if (restored) setScene(restored);
+        if (restored) {
+          setScene(restored);
+          setSceneHistory([storedScene]);
+          setSceneFuture([]);
+        }
+      } else {
+        setSceneHistory([serializeScene(createDemoScene())]);
+        setSceneFuture([]);
       }
       setAnimFrame(0);
       setAnimPlaying(false);
@@ -1086,10 +1137,14 @@ const Studio = () => {
     setError(null);
     setNotice("New game — edit it, then Save.");
     setScene(createDemoScene());
+    setSceneHistory([serializeScene(createDemoScene())]);
+    setSceneFuture([]);
     setObjectId(null);
     setAnimFrame(0);
     setAnimPlaying(false);
     setShading("solid");
+    setSceneHistory([serializeScene(createDemoScene())]);
+    setSceneFuture([]);
     setNonce((n) => n + 1);
   };
 
@@ -1380,6 +1435,15 @@ const Studio = () => {
             duplicateSelectedVertices(v3(0, 0.55, 0));
           }
           break;
+        case "z":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.shiftKey) redo();
+            else undo();
+            return;
+          }
+          setShading((s) => (s === "solid" ? "wire" : "solid"));
+          break;
         case "Delete":
         case "Backspace":
           e.preventDefault();
@@ -1422,7 +1486,7 @@ const Studio = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, jumpKeyframe, selectAllVertices, stopGame, toggleCameraPov]);
+  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, jumpKeyframe, selectAllVertices, stopGame, toggleCameraPov, undo, redo]);
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -2179,6 +2243,24 @@ const Studio = () => {
                 triggerClassName="flex h-full items-center rounded-[3px] px-2 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] data-[state=open]:bg-[#4772b3] data-[state=open]:text-white"
               />
             ))}
+            <button
+              type="button"
+              disabled={!canUndo}
+              onClick={undo}
+              title="Undo (Ctrl+Z)"
+              className="flex h-full items-center rounded-[3px] px-1.5 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] disabled:opacity-40"
+            >
+              <Undo size={12} />
+            </button>
+            <button
+              type="button"
+              disabled={!canRedo}
+              onClick={redo}
+              title="Redo (Ctrl+Shift+Z)"
+              className="flex h-full items-center rounded-[3px] px-1.5 text-[11px] text-[#b0b0b0] hover:bg-[#3a3a3a] disabled:opacity-40"
+            >
+              <Redo size={12} />
+            </button>
             <div className="ml-auto flex items-center gap-1">
               {SHADING.map((s) => {
                 const Icon = s.icon;
