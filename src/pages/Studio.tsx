@@ -29,6 +29,7 @@ import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3
 import {
   activeCamera,
   addObject,
+  animationEndFrame,
   cloneObject,
   createCamera,
   createDemoScene,
@@ -38,7 +39,9 @@ import {
   deleteVertices,
   deserializeScene,
   duplicateSelection,
+  evaluateScene,
   findObject,
+  insertKeyframe,
   moveVertices,
   nextId,
   patchObject,
@@ -103,6 +106,7 @@ import {
   Move,
   MousePointer2,
   Bot,
+  Orbit,
   PanelRight,
   PenTool,
   Play,
@@ -166,6 +170,7 @@ const TOOLS = [
 const SHADING = [
   { id: "wire", icon: Circle, label: "Wireframe", tip: "Show edges only." },
   { id: "solid", icon: Square, label: "Solid", tip: "Default shaded viewport." },
+  { id: "smooth", icon: Orbit, label: "Smooth", tip: "Per-vertex shading for organic / low-poly surfaces." },
   { id: "mat", icon: Sun, label: "Material Preview", tip: "Preview materials with a studio light." },
   { id: "rend", icon: Camera, label: "Rendered", tip: "Full render preview." },
 ];
@@ -265,6 +270,12 @@ const Studio = () => {
   const [cursor, setCursor] = useState<Vec3>(() => v3(0, 0, 0));
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
+  // ---- Animation (Blender-style keyframes + timeline playback) ----
+  const [animFrame, setAnimFrame] = useState(0);
+  const [animPlaying, setAnimPlaying] = useState(false);
+  const animFrameRef = useRef(0);
+  const animPlayingRef = useRef(false);
+
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
   const [propTab, setPropTab] = useState("scene");
@@ -344,6 +355,14 @@ const Studio = () => {
         theme: { ...DEFAULT_CONFIG.theme, ...((gp?.theme as object) ?? {}) },
         names: { ...DEFAULT_CONFIG.names, ...((gp?.names as object) ?? {}) },
       });
+      // Restore the editor's 3D scene (objects, transforms AND keyframes).
+      const storedScene = (rec.studio_data?.scene as string | undefined) ?? null;
+      if (storedScene) {
+        const restored = deserializeScene(storedScene);
+        if (restored) setScene(restored);
+      }
+      setAnimFrame(0);
+      setAnimPlaying(false);
       setLoading(false);
     })();
     return () => {
@@ -553,6 +572,89 @@ const Studio = () => {
   /** Stop the run and return to the scene view (Esc / Stop). */
   const stopGame = useCallback(() => setGameStatus("stopped"), []);
 
+  // ---- Animation: playback clock, dope-sheet channels, keyframe insertion ----
+
+  // The viewport renders the evaluated scene while playing (or while scrubbing),
+  // so an animation actually MOVES the 3D view — Blender-style.
+  const animEnd = Math.max(120, animationEndFrame(scene));
+  const animatedScene = useMemo(
+    () => (animPlaying || animFrame !== 0 ? evaluateScene(scene, animFrame) : scene),
+    [scene, animPlaying, animFrame],
+  );
+
+  const dopeChannels = useMemo(() => {
+    const out: { name: string; frames: number[] }[] = [];
+    for (const obj of scene.objects) {
+      const anim = obj.anim;
+      if (!anim) continue;
+      (["pos", "rot", "scl"] as const).forEach((ch, idx) => {
+        const track = anim[ch];
+        if (track && track.frames.length > 0)
+          out.push({ name: `${obj.name} · ${["Location", "Rotation", "Scale"][idx]}`, frames: track.frames });
+      });
+    }
+    return out;
+  }, [scene]);
+
+  const animKeyFrames = useMemo(() => {
+    const frames = new Set<number>();
+    for (const obj of scene.objects)
+      for (const ch of ["pos", "rot", "scl"] as const) obj.anim?.[ch]?.frames.forEach((f) => frames.add(f));
+    return [...frames];
+  }, [scene]);
+
+  useEffect(() => {
+    animFrameRef.current = animFrame;
+  }, [animFrame]);
+  useEffect(() => {
+    animPlayingRef.current = animPlaying;
+  }, [animPlaying]);
+
+  // Timeline playback loop (Blender's default 24 fps, loops at the end).
+  useEffect(() => {
+    if (!animPlaying) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setAnimFrame((f) => {
+        const next = f + dt * 24;
+        if (animEnd > 0 && next >= animEnd) return 0; // loop
+        return next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [animPlaying, animEnd]);
+
+  /** Blender I — insert a keyframe on the selected object's transform channel
+   * at the current frame; "all" writes Location + Rotation + Scale. */
+  const insertKeyframeAction = useCallback(
+    (channel: "pos" | "rot" | "scl" | "all") => {
+      if (config.dimension !== "3d" || !objectId) {
+        setNotice("Select a 3D object to keyframe it (press I).");
+        return;
+      }
+      const obj = findObject(scene, objectId);
+      if (!obj) return;
+      const frame = Math.round(animFrame);
+      setScene((s) => {
+        let next = s;
+        if (channel === "all" || channel === "pos")
+          next = insertKeyframe(next, objectId, "pos", frame, obj.transform.position);
+        if (channel === "all" || channel === "rot")
+          next = insertKeyframe(next, objectId, "rot", frame, obj.transform.rotation);
+        if (channel === "all" || channel === "scl")
+          next = insertKeyframe(next, objectId, "scl", frame, obj.transform.scale);
+        return next;
+      });
+      setNotice(`Keyframe on "${obj.name}" at frame ${frame} — press Alt+A to preview.`);
+    },
+    [config.dimension, objectId, scene, animFrame],
+  );
+
   // ---- Asset import / export (real interchange formats) ---------------------
 
   /** Adds a parsed model (or one of its meshes) to the scene, grounded. */
@@ -749,48 +851,44 @@ const Studio = () => {
     [],
   );
 
-  /** Gizmo drag: move / rotate / scale the selected object. */
+  /** Gizmo drag: move / rotate / scale the selected object. With playback
+   * running the drag auto-records keyframes (Blender autokey behaviour). */
   const handleTransform = useCallback(
     (delta: Vec3, mode: "move" | "rotate" | "scale") => {
       if (!objectId || !selectedObject) return;
       setScene((s) => {
         const obj = findObject(s, objectId);
         if (!obj) return s;
+        let next = s;
         if (mode === "move") {
-          return patchObject(s, objectId, {
-            transform: {
-              ...obj.transform,
-              position: [
-                obj.transform.position[0] + delta[0],
-                obj.transform.position[1] + delta[1],
-                obj.transform.position[2] + delta[2],
-              ],
-            },
-          });
+          const position: Vec3 = [
+            obj.transform.position[0] + delta[0],
+            obj.transform.position[1] + delta[1],
+            obj.transform.position[2] + delta[2],
+          ];
+          next = patchObject(s, objectId, { transform: { ...obj.transform, position } });
+          if (animPlayingRef.current) next = insertKeyframe(next, objectId, "pos", animFrameRef.current, position);
+          return next;
         }
         if (mode === "rotate") {
-          return patchObject(s, objectId, {
-            transform: {
-              ...obj.transform,
-              rotation: [
-                obj.transform.rotation[0] + delta[0] * 40,
-                obj.transform.rotation[1] + delta[1] * 40,
-                obj.transform.rotation[2] + delta[2] * 40,
-              ],
-            },
-          });
+          const rotation: Vec3 = [
+            obj.transform.rotation[0] + delta[0] * 40,
+            obj.transform.rotation[1] + delta[1] * 40,
+            obj.transform.rotation[2] + delta[2] * 40,
+          ];
+          next = patchObject(s, objectId, { transform: { ...obj.transform, rotation } });
+          if (animPlayingRef.current) next = insertKeyframe(next, objectId, "rot", animFrameRef.current, rotation);
+          return next;
         }
         const f = 1 + (delta[0] + delta[1] + delta[2]) * 0.55;
-        return patchObject(s, objectId, {
-          transform: {
-            ...obj.transform,
-            scale: [
-              clampScale(obj.transform.scale[0] * f),
-              clampScale(obj.transform.scale[1] * f),
-              clampScale(obj.transform.scale[2] * f),
-            ],
-          },
-        });
+        const scale: Vec3 = [
+          clampScale(obj.transform.scale[0] * f),
+          clampScale(obj.transform.scale[1] * f),
+          clampScale(obj.transform.scale[2] * f),
+        ];
+        next = patchObject(s, objectId, { transform: { ...obj.transform, scale } });
+        if (animPlayingRef.current) next = insertKeyframe(next, objectId, "scl", animFrameRef.current, scale);
+        return next;
       });
     },
     [objectId, selectedObject],
@@ -863,7 +961,7 @@ const Studio = () => {
       const title = opts?.title ?? config.title;
       const gameplay = buildGameplay(config);
       const assets = { palette: "custom", generatedBy: "nexstudio", prompt: config.description };
-      const studioData = { source: "nexstudio", editedAt: new Date().toISOString() };
+      const studioData = { source: "nexstudio", editedAt: new Date().toISOString(), scene: serializeScene(scene) };
 
       if (record && !opts?.asNew) {
         const alreadyReleased = Boolean(record.released_at);
@@ -958,6 +1056,11 @@ const Studio = () => {
     setSelected("game");
     setError(null);
     setNotice("New game — edit it, then Save.");
+    setScene(createDemoScene());
+    setObjectId(null);
+    setAnimFrame(0);
+    setAnimPlaying(false);
+    setShading("solid");
     setNonce((n) => n + 1);
   };
 
@@ -1128,6 +1231,13 @@ const Studio = () => {
         else toggleCameraPov();
         return;
       }
+      // Blender Alt+A — play / pause the animation timeline.
+      if (e.altKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        e.stopPropagation();
+        setAnimPlaying((p) => !p);
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // While playing, hand every key to the game except Escape (stop).
       if (gameStatus !== "stopped") {
@@ -1226,6 +1336,14 @@ const Studio = () => {
           // Blender Z: toggle solid ⇄ wireframe viewport shading.
           setShading((s) => (s === "solid" ? "wire" : "solid"));
           break;
+        case "i":
+        case "I":
+          // Blender I — insert a keyframe for the selected 3D object.
+          if (config.dimension === "3d" && objectId && modeKey !== "edit") {
+            e.preventDefault();
+            insertKeyframeAction("all");
+          }
+          break;
         case "e":
           // Blender E: extrude/offset the selected vertices in Edit Mode.
           if (modeKey === "edit" && selectedVertices.length > 0) {
@@ -1255,7 +1373,7 @@ const Studio = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, selectAllVertices, stopGame, toggleCameraPov]);
+  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, selectAllVertices, stopGame, toggleCameraPov]);
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -2114,7 +2232,7 @@ const Studio = () => {
               })();
             }}
             viewport={{
-              scene,
+              scene: animatedScene,
               selectedId: objectId,
               selectedVertices,
               editMode: modeKey,
@@ -2125,6 +2243,7 @@ const Studio = () => {
               cursor,
               cursorTool: tool === "Cursor",
               cameraPov,
+              shading,
               onSelectObject: (id) => setObjectId(id),
               onSelectVertices: (idx) => setSelectedVertices(idx),
               onTransform: handleTransform,
@@ -2154,6 +2273,17 @@ const Studio = () => {
             outlinerHeight={outlinerHeight}
             setOutlinerHeight={setOutlinerHeight}
             showTips={showTips}
+            setConfig={setConfig}
+            onApplyLogic={() => void persist(false)}
+            onPlayLogic={toggleGamePlay}
+            animFrame={animFrame}
+            animPlaying={animPlaying}
+            animEnd={animEnd}
+            animKeyFrames={animKeyFrames}
+            dopeChannels={dopeChannels}
+            onAnimFrame={setAnimFrame}
+            onAnimToggle={() => setAnimPlaying((p) => !p)}
+            onInsertKeyframe={(ch) => insertKeyframeAction(ch)}
           />
           {showAIAssistant && <MusePromptBar muse={muse} />}
         </div>
