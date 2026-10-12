@@ -124,6 +124,13 @@ interface LayoutProps {
   onInsertKeyframe: (channel: "pos" | "rot" | "scl" | "all") => void;
   autoKey: boolean;
   onToggleAutoKey: () => void;
+  // 2D editor props
+  scene2d: import("@/lib/scene2d").Scene2D;
+  onScene2dChange: (patch: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  canUndo2d: boolean;
+  canRedo2d: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -203,7 +210,14 @@ export function WorkspaceRenderer(props: LayoutProps) {
       {dimension === "3d" ? (
         <Viewport3D ref={viewportRef} {...viewport} />
       ) : (
-        <SpriteEditor />
+        <SpriteEditor
+          scene={props.scene2d}
+          onChange={props.onScene2dChange}
+          canUndo={props.canUndo2d}
+          canRedo={props.canRedo2d}
+          onUndo={props.onUndo}
+          onRedo={props.onRedo}
+        />
       )}
     </div>
   );
@@ -390,7 +404,14 @@ export function WorkspaceRenderer(props: LayoutProps) {
         </div>
       ) : workspace === "Shading" ? (
         <div className="flex h-[200px] shrink-0 border-t border-black">
-          <SpriteEditor />
+          <SpriteEditor
+            scene={props.scene2d}
+            onChange={props.onScene2dChange}
+            canUndo={props.canUndo2d}
+            canRedo={props.canRedo2d}
+            onUndo={props.onUndo}
+            onRedo={props.onRedo}
+          />
         </div>
       ) : (
         timelineFor("timeline-other")
