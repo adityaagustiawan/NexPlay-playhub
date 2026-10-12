@@ -25,6 +25,12 @@ import {
   type StudioConfig,
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
+import {
+  createScene2D,
+  serializeScene2D,
+  deserializeScene2D,
+  type Scene2D,
+} from "@/lib/scene2d";
 import { Viewport3D, type Viewport3DHandle, type ViewportShading } from "@/components/studio/Viewport3D";
 import {
   activeCamera,
@@ -285,6 +291,12 @@ const Studio = () => {
   const animPlayingRef = useRef(false);
   const autoKeyRef = useRef(true);
 
+  // ---- 2D scene (game asset editor) ----
+  const [scene2d, setScene2d] = useState<Scene2D>(() => createScene2D());
+  const [scene2dHistory, setScene2dHistory] = useState<string[]>([serializeScene2D(createScene2D())]);
+  const [scene2dFuture, setScene2dFuture] = useState<string[]>([]);
+  const canUndo2d = scene2dHistory.length > 1;
+  const canRedo2d = scene2dFuture.length > 0;
 
   const pushSceneHistory = useCallback(
     (next: Scene, replace = false) => {
@@ -300,7 +312,31 @@ const Studio = () => {
     [],
   );
 
+  const pushScene2dHistory = useCallback(
+    (next: Scene2D, replace = false) => {
+      setScene2dHistory((h) => {
+        const snap = serializeScene2D(next);
+        const prev = h[h.length - 1];
+        if (!replace && prev === snap) return h;
+        const nh = replace ? [...h.slice(0, -1), snap] : [...h, snap];
+        return nh.length > 100 ? nh.slice(nh.length - 100) : nh;
+      });
+      if (!replace) setScene2dFuture([]);
+    },
+    [],
+  );
+
   const undo = useCallback(() => {
+    if (config.dimension === "2d") {
+      if (scene2dHistory.length <= 1) return;
+      const curSnap = serializeScene2D(scene2d);
+      const targetSnap = scene2dHistory[scene2dHistory.length - 2];
+      const restored = deserializeScene2D(targetSnap);
+      if (restored) setScene2d(restored);
+      setScene2dHistory((h) => h.slice(0, -1));
+      setScene2dFuture((f) => [curSnap, ...f].slice(0, 100));
+      return;
+    }
     if (sceneHistory.length <= 1) return;
     const curSnap = serializeScene(scene);
     const targetSnap = sceneHistory[sceneHistory.length - 2];
@@ -310,9 +346,19 @@ const Studio = () => {
     setSceneFuture((f) => [curSnap, ...f].slice(0, 100));
     setAnimFrame(0);
     setObjectId(null);
-  }, [scene, sceneHistory]);
+  }, [config.dimension, scene, sceneHistory, scene2d, scene2dHistory]);
 
   const redo = useCallback(() => {
+    if (config.dimension === "2d") {
+      if (scene2dFuture.length === 0) return;
+      const curSnap = serializeScene2D(scene2d);
+      const targetSnap = scene2dFuture[0];
+      const restored = deserializeScene2D(targetSnap);
+      if (restored) setScene2d(restored);
+      setScene2dFuture((f) => f.slice(1));
+      setScene2dHistory((h) => [...h, curSnap].slice(-100));
+      return;
+    }
     if (sceneFuture.length === 0) return;
     const curSnap = serializeScene(scene);
     const targetSnap = sceneFuture[0];
@@ -321,7 +367,7 @@ const Studio = () => {
     setSceneFuture((f) => f.slice(1));
     setSceneHistory((h) => [...h, curSnap].slice(-100));
     setAnimFrame(0);
-  }, [scene, sceneFuture]);
+  }, [config.dimension, scene, sceneFuture, scene2d, scene2dFuture]);
 
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
@@ -410,11 +456,18 @@ const Studio = () => {
           setScene(restored);
           setSceneHistory([storedScene]);
           setSceneFuture([]);
+        } else {
+          setSceneHistory([serializeScene(createDemoScene())]);
+          setSceneFuture([]);
         }
       } else {
         setSceneHistory([serializeScene(createDemoScene())]);
         setSceneFuture([]);
       }
+      // 2D scene reset on load (optional: could extend studio_data later)
+      setScene2d(createScene2D());
+      setScene2dHistory([serializeScene2D(createScene2D())]);
+      setScene2dFuture([]);
       setAnimFrame(0);
       setAnimPlaying(false);
       setLoading(false);
@@ -1139,6 +1192,9 @@ const Studio = () => {
     setScene(createDemoScene());
     setSceneHistory([serializeScene(createDemoScene())]);
     setSceneFuture([]);
+    setScene2d(createScene2D());
+    setScene2dHistory([serializeScene2D(createScene2D())]);
+    setScene2dFuture([]);
     setObjectId(null);
     setAnimFrame(0);
     setAnimPlaying(false);
