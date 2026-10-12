@@ -57,6 +57,7 @@ import {
 } from "@/lib/scene3d";
 import {
   downloadBlob,
+  exportFbx,
   exportGlb,
   exportObj,
   exportStl,
@@ -587,14 +588,16 @@ const Studio = () => {
     [addImportedMesh],
   );
 
-  /** File ▸ Export As (3D): GLB / OBJ / STL — opens in Blender, Unity, printers. */
+  /** File ▸ Export As (3D): GLB / FBX / OBJ / STL — engine-ready interchange. */
   const exportCurrent3D = useCallback(
-    (format: "glb" | "obj" | "stl") => {
+    (format: "glb" | "fbx" | "obj" | "stl") => {
       const base = slugify(config.title || "scene") || "scene";
       try {
         const count = sceneMeshObjects(scene).length;
         if (format === "glb") {
           downloadBlob(new Blob([exportGlb(scene, { name: base })], { type: "model/gltf-binary" }), `${base}.glb`);
+        } else if (format === "fbx") {
+          downloadBlob(new Blob([exportFbx(scene, { name: base })], { type: "application/octet-stream" }), `${base}.fbx`);
         } else if (format === "obj") {
           downloadBlob(new Blob([exportObj(scene, base)], { type: "text/plain" }), `${base}.obj`);
         } else {
@@ -607,6 +610,24 @@ const Studio = () => {
     },
     [config.title, scene],
   );
+
+  /** One click, all interchange formats: GLB (Godot/Unreal-5/Blender/Unity) + FBX (Unreal) + OBJ + STL. */
+  const exportAll3D = useCallback(() => {
+    const base = slugify(config.title || "scene") || "scene";
+    try {
+      const glb = exportGlb(scene, { name: base });
+      const fbx = exportFbx(scene, { name: base });
+      const obj = exportObj(scene, base);
+      const stl = exportStl(scene, base);
+      downloadBlob(new Blob([glb], { type: "model/gltf-binary" }), `${base}.glb`);
+      downloadBlob(new Blob([fbx], { type: "application/octet-stream" }), `${base}.fbx`);
+      downloadBlob(new Blob([obj], { type: "text/plain" }), `${base}.obj`);
+      downloadBlob(new Blob([stl], { type: "model/stl" }), `${base}.stl`);
+      setNotice("Exported GLB + FBX + OBJ + STL — drop them into Godot, Unreal, Blender or Unity.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed.");
+    }
+  }, [config.title, scene]);
 
   /** File ▸ Export As (2D): a rendered game frame (PNG) + gameplay JSON. */
   const exportCurrent2D = useCallback(async () => {
@@ -1012,8 +1033,13 @@ const Studio = () => {
     },
     {
       id: "file.export.glb",
-      label: "File: Export As ▸ GLB (.glb)",
+      label: "File: Export for Godot / Unreal / Blender ▸ GLB (.glb)",
       run: () => exportCurrent3D("glb"),
+    },
+    {
+      id: "file.export.fbx",
+      label: "File: Export for Unreal Engine ▸ FBX (.fbx)",
+      run: () => exportCurrent3D("fbx"),
     },
     {
       id: "file.export.obj",
@@ -1024,6 +1050,11 @@ const Studio = () => {
       id: "file.export.stl",
       label: "File: Export As ▸ STL (.stl)",
       run: () => exportCurrent3D("stl"),
+    },
+    {
+      id: "file.export.all",
+      label: "File: Export Everything (GLB + FBX + OBJ + STL)",
+      run: exportAll3D,
     },
     {
       id: "file.export.2d",
@@ -1286,17 +1317,34 @@ const Studio = () => {
         },
         { separator: true },
         {
-          label: "Import Model… (.glb / .obj)",
+          label: "Import Model… (.glb / .obj — or drag & drop into the viewport)",
           onSelect: () => importInputRef.current?.click(),
         },
-        { section: "Export As" },
+        { section: "Export for Godot" },
         {
-          label: "GLB (.glb) — Blender / Unity",
+          label: "GLB (.glb) — Godot native import",
+          onSelect: () => exportCurrent3D("glb"),
+          disabled: config.dimension !== "3d",
+        },
+        { section: "Export for Unreal Engine" },
+        {
+          label: "FBX (.fbx) — Unreal actor import",
+          onSelect: () => exportCurrent3D("fbx"),
+          disabled: config.dimension !== "3d",
+        },
+        {
+          label: "GLB (.glb) — Unreal 5 Interchange",
+          onSelect: () => exportCurrent3D("glb"),
+          disabled: config.dimension !== "3d",
+        },
+        { section: "Blender / Unity / printing" },
+        {
+          label: "GLB (.glb) — Blender · Unity · MS 3D Viewer",
           onSelect: () => exportCurrent3D("glb"),
           disabled: config.dimension !== "3d",
         },
         {
-          label: "OBJ (.obj) — Blender / Unity",
+          label: "OBJ (.obj) — Blender · Unity · Meshlab",
           onSelect: () => exportCurrent3D("obj"),
           disabled: config.dimension !== "3d",
         },
@@ -1306,12 +1354,17 @@ const Studio = () => {
           disabled: config.dimension !== "3d",
         },
         {
-          label: "PNG frame + gameplay JSON — 2D",
+          label: "Export everything (GLB + FBX + OBJ + STL)",
+          onSelect: exportAll3D,
+          disabled: config.dimension !== "3d",
+        },
+        {
+          label: "PNG frame + gameplay JSON — 2D games (any engine)",
           onSelect: () => void exportCurrent2D(),
           disabled: config.dimension !== "2d",
         },
         {
-          label: config.dimension === "3d" ? "3D scene exports GLB·OBJ·STL" : "2D game exports PNG + JSON",
+          label: config.dimension === "3d" ? "3D exports GLB·FBX·OBJ·STL — 2D exports PNG+JSON" : "2D exports PNG + JSON — 3D exports GLB·FBX·OBJ·STL",
           onSelect: undefined,
           disabled: true,
         },
@@ -2041,6 +2094,25 @@ const Studio = () => {
             tools={TOOLS}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
+            onViewportDragOver={(e) => {
+              if (config.dimension !== "3d") return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            onViewportDrop={(e) => {
+              if (config.dimension !== "3d") return;
+              e.preventDefault();
+              const files = Array.from(e.dataTransfer.files ?? []);
+              const models = files.filter((f) => /\.(glb|obj)$/i.test(f.name));
+              if (models.length === 0) {
+                setNotice("Drop a .glb or .obj model file into the 3D viewport.");
+                return;
+              }
+              setNotice(`Importing ${models.length} model file${models.length === 1 ? "" : "s"}…`);
+              void (async () => {
+                for (const file of models) await importModelFile(file);
+              })();
+            }}
             viewport={{
               scene,
               selectedId: objectId,

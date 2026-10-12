@@ -5,8 +5,8 @@
 // on GitHub. "Add" downloads the .glb, parses it (importGlb) and hands the
 // meshes to the scene as grounded objects.
 import { useCallback, useEffect, useState } from "react";
-import { Download, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
-import { importGlb, type ImportedMesh } from "@/lib/gltf";
+import { Download, FileDown, Loader2, PackagePlus, RefreshCw, FolderOpen } from "lucide-react";
+import { downloadBlob, importGlb, type ImportedMesh } from "@/lib/gltf";
 
 interface RemoteAsset {
   id: string;
@@ -116,6 +116,23 @@ export function AssetLibrary({ onAddMesh, onImportFile }: Props) {
     },
     [onAddMesh],
   );
+
+  /** Downloads just the raw .glb, so engines can import it directly. */
+  const downloadAsset = useCallback(async (a: { id: string; url: string; name?: string }) => {
+    setAdding((s) => ({ ...s, [a.id]: true }));
+    setFail((s) => ({ ...s, [a.id]: "" }));
+    try {
+      const res = await fetch(a.url, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const slug = (a.name ?? a.id).replace(/\W+/g, "-").toLowerCase();
+      downloadBlob(new Blob([buf], { type: "model/gltf-binary" }), `${slug}.glb`);
+    } catch (e) {
+      setFail((s) => ({ ...s, [a.id]: e instanceof Error ? e.message : "Download failed" }));
+    } finally {
+      setAdding((s) => ({ ...s, [a.id]: false }));
+    }
+  }, []);
 
   const card = (a: { id: string; name: string; credit: string; license: string; url: string; thumb?: string; label?: string }) => (
     <div key={a.id} className="flex flex-col overflow-hidden rounded-[4px] border border-[#3d3d3d] bg-[#282828]">
