@@ -860,6 +860,32 @@ export function createMeshObject(
   };
 }
 
+/**
+ * Creates a mesh object from arbitrary geometry (e.g. an imported GLB/OBJ
+ * model). Like `spawnTransform`, the object is grounded: position.y is lowered
+ * so the mesh's lowest vertex sits on the studio floor (world y = 0).
+ */
+export function createMeshObjectFromData(
+  name: string,
+  mesh: MeshData,
+  position: Vec3 = v3(0, 0, 0),
+  color?: string,
+): SceneObject {
+  const bounds = boundsOf(mesh.vertices);
+  return {
+    id: nextId("mesh"),
+    name,
+    kind: "mesh",
+    mesh,
+    transform: {
+      ...defaultTransform(),
+      position: v3(position[0], position[1] - bounds.min[1], position[2]),
+    },
+    color: color ?? PALETTE[Math.max(0, name.length) % PALETTE.length],
+    visible: true,
+  };
+}
+
 /** Creates a camera that looks at `target` from `position`, at an optional roll. */
 export function createCamera(position: Vec3 = v3(7, 5, 9), target: Vec3 = v3(0, 1, 0)): SceneObject {
   return {
