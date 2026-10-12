@@ -10,11 +10,13 @@ interface Props {
   fps?: number;
   frame: number;
   playing: boolean;
+  autoKey?: boolean;
   endFrame: number;
   /** Frame numbers that carry any keyframe, for the key diamonds. */
   keyFrames?: number[];
   onFrameChange: (frame: number) => void;
   onTogglePlay: () => void;
+  onToggleAutoKey?: () => void;
   onInsertKeyframe: (channel: Channel) => void;
 }
 
@@ -29,10 +31,12 @@ export function Timeline({
   fps = 24,
   frame,
   playing,
+  autoKey = true,
   endFrame = 120,
   keyFrames = [],
   onFrameChange,
   onTogglePlay,
+  onToggleAutoKey,
   onInsertKeyframe,
 }: Props) {
   const [insertOpen, setInsertOpen] = useState(false);
@@ -101,13 +105,23 @@ export function Timeline({
           <button
             type="button"
             className="flex h-6 items-center gap-1 rounded-[3px] border border-[#e6cd5b]/40 px-2 text-[#e6cd5b] hover:bg-[#3a3a3a]"
-            title="Insert keyframe (I)"
+            title="Insert keyframe (I) — Location/Rotation/Scale at current frame"
             onClick={() => setInsertOpen((v) => !v)}
           >
             <Diamond size={11} fill="currentColor" /> Insert
           </button>
           {insertOpen && (
             <div className="absolute right-0 top-7 z-20 w-44 rounded-[4px] border border-[#1d1d1d] bg-[#383838] py-1 shadow-xl">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#4772b3]"
+                onClick={() => {
+                  onInsertKeyframe("all");
+                  setInsertOpen(false);
+                }}
+              >
+                <Diamond size={10} fill="#e6cd5b" stroke="#e6cd5b" /> All (Loc/Rot/Sca)
+              </button>
               {(
                 [
                   ["pos", "Location"],
@@ -170,10 +184,17 @@ export function Timeline({
           <kbd className="rounded border border-[#4a4a4a] px-1">Alt+A</kbd> play
         </span>
         <span>
-          <kbd className="rounded border border-[#4a4a4a] px-1">I</kbd> insert keyframe
+          <kbd className="rounded border border-[#4a4a4a] px-1">I</kbd> insert (all) · <kbd className="rounded border border-[#4a4a4a] px-1">←/→</kbd> frame · <kbd className="rounded border border-[#4a4a4a] px-1">Shift+↑/↓</kbd> keys
         </span>
-        <span className="ml-auto">
-          {keySet.size > 0 ? `${keySet.size} keyf${keySet.size === 1 ? "rame" : "rames"}` : "no keys yet — move the selected object and press I"}
+        <span className="ml-auto flex items-center gap-1">
+          <span
+            className={`h-2 w-2 rounded-full ${autoKey ? "bg-[#e6cd5b] shadow-[0_0_0_3px_rgba(230,205,91,0.12)]" : "bg-[#5a5a5a]"}`}
+            title={autoKey ? "Auto-Key: recording on transform" : "Auto-Key: off"}
+          />
+          <span className={autoKey ? "text-[#e6cd5b]" : "text-[#7a7a7a]"}>REC</span>
+        </span>
+        <span>
+          {keySet.size > 0 ? `${keySet.size} keyf${keySet.size === 1 ? "rame" : "rames"}` : "no keys yet — select object, press I or turn REC on and transform"}
         </span>
       </div>
     </div>
