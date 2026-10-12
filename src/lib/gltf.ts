@@ -35,6 +35,19 @@ export function triangulate(faces: number[][]): number[][] {
   return out;
 }
 
+/** Unit-length face normal (area-weighted cross product). */
+export function faceNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const n: Vec3 = [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+  const len = Math.hypot(n[0], n[1], n[2]);
+  return len > 1e-12 ? [n[0] / len, n[1] / len, n[2] / len] : [0, 0, 1];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return [0.88, 0.88, 0.88];
