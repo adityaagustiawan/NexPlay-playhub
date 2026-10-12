@@ -273,8 +273,11 @@ const Studio = () => {
   // ---- Animation (Blender-style keyframes + timeline playback) ----
   const [animFrame, setAnimFrame] = useState(0);
   const [animPlaying, setAnimPlaying] = useState(false);
+  /** Blender auto-keying: gizmo transforms record keyframes (REC indicator). */
+  const [autoKey, setAutoKey] = useState(true);
   const animFrameRef = useRef(0);
   const animPlayingRef = useRef(false);
+  const autoKeyRef = useRef(true);
 
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
@@ -609,6 +612,30 @@ const Studio = () => {
   useEffect(() => {
     animPlayingRef.current = animPlaying;
   }, [animPlaying]);
+  useEffect(() => {
+    autoKeyRef.current = autoKey;
+  }, [autoKey]);
+
+  /** Jump to the previous / next keyframe across every channel (Shift+arrows). */
+  const jumpKeyframe = useCallback(
+    (dir: 1 | -1) => {
+      const frames: number[] = [];
+      for (const obj of scene.objects)
+        for (const ch of ["pos", "rot", "scl"] as const) obj.anim?.[ch]?.frames.forEach((f) => frames.push(f));
+      if (frames.length === 0) {
+        setNotice("No keyframes yet — select an object and press I to insert one.");
+        return;
+      }
+      const sorted = Array.from(new Set(frames)).sort((a, b) => a - b);
+      const cf = Math.round(animFrame);
+      const next =
+        dir === 1
+          ? sorted.find((f) => f > cf)
+          : [...sorted].reverse().find((f) => f < cf);
+      setAnimFrame(next ?? (dir === 1 ? sorted[0] : sorted[sorted.length - 1]));
+    },
+    [scene, animFrame],
+  );
 
   // Timeline playback loop (Blender's default 24 fps, loops at the end).
   useEffect(() => {
@@ -851,11 +878,13 @@ const Studio = () => {
     [],
   );
 
-  /** Gizmo drag: move / rotate / scale the selected object. With playback
-   * running the drag auto-records keyframes (Blender autokey behaviour). */
+  /** Gizmo drag: move / rotate / scale the selected object. With auto-keying on
+   * (the REC button) drags record keyframes at the current frame — Blender's
+   * frame-by-frame rigging workflow. */
   const handleTransform = useCallback(
     (delta: Vec3, mode: "move" | "rotate" | "scale") => {
       if (!objectId || !selectedObject) return;
+      const atFrame = Math.round(animFrameRef.current);
       setScene((s) => {
         const obj = findObject(s, objectId);
         if (!obj) return s;
@@ -867,7 +896,7 @@ const Studio = () => {
             obj.transform.position[2] + delta[2],
           ];
           next = patchObject(s, objectId, { transform: { ...obj.transform, position } });
-          if (animPlayingRef.current) next = insertKeyframe(next, objectId, "pos", animFrameRef.current, position);
+          if (autoKeyRef.current) next = insertKeyframe(next, objectId, "pos", atFrame, position);
           return next;
         }
         if (mode === "rotate") {
@@ -877,7 +906,7 @@ const Studio = () => {
             obj.transform.rotation[2] + delta[2] * 40,
           ];
           next = patchObject(s, objectId, { transform: { ...obj.transform, rotation } });
-          if (animPlayingRef.current) next = insertKeyframe(next, objectId, "rot", animFrameRef.current, rotation);
+          if (autoKeyRef.current) next = insertKeyframe(next, objectId, "rot", atFrame, rotation);
           return next;
         }
         const f = 1 + (delta[0] + delta[1] + delta[2]) * 0.55;
@@ -887,7 +916,7 @@ const Studio = () => {
           clampScale(obj.transform.scale[2] * f),
         ];
         next = patchObject(s, objectId, { transform: { ...obj.transform, scale } });
-        if (animPlayingRef.current) next = insertKeyframe(next, objectId, "scl", animFrameRef.current, scale);
+        if (autoKeyRef.current) next = insertKeyframe(next, objectId, "scl", atFrame, scale);
         return next;
       });
     },
@@ -1366,6 +1395,26 @@ const Studio = () => {
           if (modeKey === "edit" || modeKey === "vertexpaint") selectAllVertices();
           else setShowAIAssistant((v) => !v);
           break;
+        case "ArrowLeft":
+          e.preventDefault();
+          setAnimFrame((f) => Math.max(0, Math.round(f) - 1));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          setAnimFrame((f) => Math.max(0, Math.round(f) + 1));
+          break;
+        case "ArrowUp":
+          if (e.shiftKey) {
+            e.preventDefault();
+            jumpKeyframe(1);
+          }
+          break;
+        case "ArrowDown":
+          if (e.shiftKey) {
+            e.preventDefault();
+            jumpKeyframe(-1);
+          }
+          break;
         default:
           break;
       }
@@ -1373,7 +1422,7 @@ const Studio = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, selectAllVertices, stopGame, toggleCameraPov]);
+  }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, jumpKeyframe, selectAllVertices, stopGame, toggleCameraPov]);
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
@@ -1382,7 +1431,7 @@ const Studio = () => {
       const k = e.key.toLowerCase();
       if (k === "s") {
         e.preventDefault();
-        persist(e.shiftKey);
+        void persist(e.shiftKey);
       } else if (k === "o") {
         e.preventDefault();
         refreshMyGames();
