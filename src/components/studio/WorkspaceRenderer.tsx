@@ -16,7 +16,6 @@ import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
 import { GameLogicEditor } from "@/components/studio/GameLogicEditor";
 import { GamePreview } from "@/components/GamePreview";
 import { GameView, type GameStatus } from "@/components/studio/GameView";
-import { Play } from "lucide-react";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
 import type { SceneObject } from "@/lib/scene3d";
@@ -268,17 +267,6 @@ export function WorkspaceRenderer(props: LayoutProps) {
                     : `${config.mode} view · ${dimension.toUpperCase()}`}
                 </div>
                 {RenderViewport(`${dimension}-${nonce}`)}
-                {game && (
-                  <button
-                    type="button"
-                    title="Play the game in the viewport (Ctrl+P)"
-                    onClick={() => game.onStatusChange("playing")}
-                    className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-[#4772b3] px-2.5 py-1 font-body text-[11px] font-medium text-white shadow-lg transition-opacity hover:opacity-90"
-                  >
-                    <Play className="h-3 w-3" fill="currentColor" />
-                    Play
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -355,17 +343,6 @@ export function WorkspaceRenderer(props: LayoutProps) {
               </div>
             )}
             {RenderViewport(`${dimension}-${nonce}`)}
-            {game && (
-              <button
-                type="button"
-                title="Play the game in the viewport (Ctrl+P)"
-                onClick={() => game.onStatusChange("playing")}
-                className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-[4px] bg-[#4772b3] px-2.5 py-1 font-body text-[11px] font-medium text-white shadow-lg transition-opacity hover:opacity-90"
-              >
-                <Play className="h-3 w-3" fill="currentColor" />
-                Play
-              </button>
-            )}
           </>
         )}
       </div>
