@@ -120,8 +120,9 @@ interface LayoutProps {
   dopeChannels: import("@/components/studio/DopeSheet").DopeChannel[];
   onAnimFrame: (f: number) => void;
   onAnimToggle: () => void;
-  onInsertKeyframe: (channel: "pos" | "rot" | "scl") => void;
-}
+  onInsertKeyframe: (channel: "pos" | "rot" | "scl" | "all") => void;
+  autoKey: boolean;
+  onToggleAutoKey: () => void;
 
 export function WorkspaceRenderer(props: LayoutProps) {
   const navigate = useNavigate();
@@ -174,7 +175,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     dopeChannels,
     onAnimFrame,
     onAnimToggle,
-    onInsertKeyframe,
+    onToggleAutoKey,
   } = props;
 
   /** The Timeline at home in every workspace that shows a bottom strip. */
@@ -183,10 +184,12 @@ export function WorkspaceRenderer(props: LayoutProps) {
       key={key}
       frame={animFrame}
       playing={animPlaying}
+      autoKey={autoKey}
       endFrame={animEnd}
       keyFrames={animKeyFrames}
       onFrameChange={onAnimFrame}
       onTogglePlay={onAnimToggle}
+      onToggleAutoKey={onToggleAutoKey}
       onInsertKeyframe={onInsertKeyframe}
     />
   );
