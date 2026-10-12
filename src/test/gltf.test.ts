@@ -10,13 +10,27 @@ import {
   v3,
 } from "@/lib/scene3d";
 import {
+  exportFbx,
   exportGlb,
   exportObj,
   exportStl,
+  faceNormal,
   importGlb,
   importObj,
   triangulate,
 } from "@/lib/gltf";
+
+/** Extracts the JSON chunk of a GLB byte array (for structural assertions). */
+function glbJson(bytes: Uint8Array): any {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jlen = dv.getUint32(12, true);
+  return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jlen)));
+}
+
+const hexToRgb = (hex: string): [number, number, number, number] => {
+  const n = parseInt(hex.replace(/^#/, ""), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+};
 
 /** Builds a minimal GLB with a single triangle (positions + indices). */
 function makeTriangleGlb(): ArrayBuffer {
@@ -97,16 +111,38 @@ describe("GLB import", () => {
   });
 });
 
+describe("faceNormal", () => {
+  it("returns the unit normal of a triangle", () => {
+    const n = faceNormal([0, 0, 0], [1, 0, 0], [0, 1, 0]);
+    expect(n[2]).toBeCloseTo(1, 5);
+    expect(n[0]).toBeCloseTo(0, 5);
+    // degenerate triangle falls back to +Z
+    expect(faceNormal([0, 0, 0], [1, 0, 0], [2, 0, 0])).toEqual([0, 0, 1]);
+  });
+
+  it("plane primitives face up (+Y) so engines cull the floor correctly", () => {
+    const mesh = createPlane(4, 2);
+    const a = mesh.vertices[0];
+    const d = mesh.vertices[3];
+    const c = mesh.vertices[4];
+    const u = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+    const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const y = u[0] * v[2] - u[2] * v[0];
+    expect(y).toBeGreaterThan(0);
+  });
+});
+
 describe("GLB export → import round trip", () => {
-  it("keeps mesh count, vertices and triangulated faces", () => {
+  it("keeps mesh count, corner-split vertices and triangulated faces", () => {
     const scene = createDemoScene();
     const bytes = exportGlb(scene, { name: "Demo" });
     const inBytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const meshes = importGlb(inBytes);
     expect(meshes).toHaveLength(1);
     expect(meshes[0].name).toBe("Cube");
-    expect(meshes[0].mesh.vertices).toHaveLength(8);
-    // The demo cube has 6 quads → 12 triangles.
+    // The demo cube has 6 quads → 12 triangles → 36 triangle-corner vertices
+    // (one vertex per corner, needed so each triangle carries a flat normal).
+    expect(meshes[0].mesh.vertices).toHaveLength(36);
     expect(meshes[0].mesh.faces).toHaveLength(12);
     expect(meshes[0].mesh.faces.every((f) => f.length === 3)).toBe(true);
   });
@@ -124,6 +160,55 @@ describe("GLB export → import round trip", () => {
     // 2x scale of a ±0.8 cube around x=+3 ⇒ x∈[1.4, 4.6].
     expect(Math.min(...xs)).toBeCloseTo(1.4, 1);
     expect(Math.max(...xs)).toBeCloseTo(4.6, 1);
+  });
+});
+
+describe("GLB export details (engine readiness)", () => {
+  it("writes NORMAL attributes and per-object coloured materials", () => {
+    const scene = createDemoScene();
+    const json = glbJson(exportGlb(scene, { name: "Demo" }));
+    expect(json.asset.version).toBe("2.0");
+    expect(json.meshes).toHaveLength(1);
+    const prim = json.meshes[0].primitives[0];
+    expect(prim.attributes.POSITION).toBeDefined();
+    expect(prim.attributes.NORMAL).toBeDefined();
+    // 2 accessors per object: POSITION + NORMAL (indices are SCALAR accessor #2)
+    expect(json.accessors).toHaveLength(3);
+    // corner-split cube → 36 positions
+    expect(json.accessors[0].count).toBe(36);
+    expect(json.accessors[0].type).toBe("VEC3");
+    expect(json.accessors[1].type).toBe("VEC3");
+    expect(json.accessors[2].componentType).toBe(5123);
+    // material carries the object colour through to the engine
+    const cube = scene.objects.find((o) => o.name === "Cube")!;
+    expect(json.materials).toHaveLength(1);
+    expect(json.materials[0].name).toContain(cube.name);
+    const col = hexToRgb(cube.color ?? "#000000");
+    json.materials[0].pbrMetallicRoughness.baseColorFactor.forEach((v: number, i: number) =>
+      expect(v).toBeCloseTo(col[i], 2),
+    );
+  });
+
+  it("uses u32 indices when corner-split vertices exceed 65,535", () => {
+    // A big-ish quad grid: 300×70 quads → 42,000 triangles → 126,000 corners.
+    const verts = Array.from({ length: 301 }, (_, x) =>
+      Array.from({ length: 71 }, (_, y) => [x / 10, 0, y / 10]),
+    ).flat();
+    const faces: number[][] = [];
+    for (let x = 0; x < 300; x++)
+      for (let y = 0; y < 70; y++) {
+        const a = x * 71 + y;
+        faces.push([a, a + 71, a + 72, a + 1]);
+      }
+    const scene = createDemoScene();
+    scene.objects = [
+      ...scene.objects.filter((o) => o.kind !== "mesh"),
+      createMeshObjectFromData("Grid", { vertices: verts, faces }),
+    ];
+    const json = glbJson(exportGlb(scene));
+    const idxAcc = json.accessors.find((a: any) => a.type === "SCALAR");
+    expect(idxAcc.componentType).toBe(5125); // UNsigned int
+    expect(idxAcc.count).toBe(126000);
   });
 });
 
@@ -151,6 +236,80 @@ describe("OBJ / STL", () => {
     expect(stl).toContain("facet normal");
     expect((stl.match(/facet normal/g) ?? []).length).toBe(12);
     expect(stl.trimEnd().endsWith("endsolid demo")).toBe(true);
+  });
+});
+
+describe("FBX export (Unreal Engine import)", () => {
+  it("emits a structurally balanced ASCII FBX 7.4 document", () => {
+    const fbx = exportFbx(createStarterScene3D(), { name: "Diorama" });
+    expect(fbx.startsWith("; FBX 7.4.0 project file")).toBe(true);
+    for (const token of [
+      "FBXHeaderExtension:",
+      "GlobalSettings:",
+      "Documents:",
+      "Definitions:",
+      "Objects:",
+      "Connections:",
+      "Takes:",
+      "FBXHeaderVersion: 1003",
+      "FBXVersion: 7400",
+    ]) {
+      expect(fbx).toContain(token);
+    }
+    const open = (fbx.match(/\{/g) ?? []).length;
+    const close = (fbx.match(/\}/g) ?? []).length;
+    expect(open).toBe(close);
+    expect(open).toBeGreaterThan(5);
+  });
+
+  it("encodes one Geometry/Model/Material per mesh with correct counts", () => {
+    const fbx = exportFbx(createDemoScene()); // 1 cube
+    expect(fbx.match(/^\tGeometry:/gm)).toHaveLength(1);
+    expect(fbx.match(/^\tModel:/gm)).toHaveLength(1);
+    expect(fbx.match(/^\tMaterial:/gm)).toHaveLength(1);
+    expect(fbx).toContain('MappingInformationType: "ByPolygonVertex"');
+    // 12 triangles → 36 polygon-corner indices, last one negated per triangle
+    const poly = /PolygonVertexIndex: \*(\d+)/.exec(fbx);
+    expect(Number(poly![1])).toBe(36);
+    // 36 corner vertices × 3 floats
+    const verts = /Vertices: \*(\d+)/.exec(fbx);
+    expect(Number(verts![1])).toBe(108);
+    // read the actual polygon indices after the PolygonVertexIndex header and
+    // check FBX's "last vertex negated − 1" encoding on every triangle
+    const lines = fbx.split("\n").map((l) => l.replace(/\r$/, ""));
+    const pi = lines.findIndex((l) => l.includes("PolygonVertexIndex:"));
+    const flat: number[] = [];
+    for (let i = pi + 1; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (!t.startsWith("a:")) break;
+      flat.push(...t.slice(2).split(",").map(Number).filter((n) => !Number.isNaN(n)));
+    }
+    expect(flat).toHaveLength(36);
+    expect(flat[35]).toBeLessThan(0);
+    for (let t = 0; t < 12; t++) expect(flat[t * 3 + 2]).toBeLessThan(0);
+  });
+
+  it("keeps definitions, connections, Y-up and object transforms consistent", () => {
+    const scene = createStarterScene3D();
+    const meshCount = scene.objects.filter((o) => o.kind === "mesh").length;
+    const fbx = exportFbx(scene);
+    // counts at section level
+    expect(fbx).toContain(`ObjectType: "Model" `);
+    expect(fbx).toContain(`Count: ${meshCount * 3 + 1}`);
+    // one model→root, geometry→model and material→model connection per part, plus the root link
+    const conns = (fbx.match(/^\tC: "OO",/gm) ?? []).length;
+    expect(conns).toBe(1 + meshCount * 3);
+    // Y-up is declared so Unreal converts to Z-up on import
+    expect(fbx).toContain('P: "UpAxis", "int", "Integer", "",1');
+    // transforms are written onto the model node (Lcl Translation / Rotation / Scaling)
+    expect(fbx).toContain('"Lcl Translation"');
+    expect(fbx).toContain('"Lcl Scaling"');
+  });
+
+  it("throws when the scene has no mesh objects", () => {
+    const scene = createDemoScene();
+    scene.objects = scene.objects.filter((o) => o.kind !== "mesh");
+    expect(() => exportFbx(scene)).toThrow(/no mesh objects/i);
   });
 });
 
