@@ -860,6 +860,32 @@ export function createMeshObject(
   };
 }
 
+/**
+ * Creates a mesh object from arbitrary geometry (e.g. an imported GLB/OBJ
+ * model). Like `spawnTransform`, the object is grounded: position.y is lowered
+ * so the mesh's lowest vertex sits on the studio floor (world y = 0).
+ */
+export function createMeshObjectFromData(
+  name: string,
+  mesh: MeshData,
+  position: Vec3 = v3(0, 0, 0),
+  color?: string,
+): SceneObject {
+  const bounds = boundsOf(mesh.vertices);
+  return {
+    id: nextId("mesh"),
+    name,
+    kind: "mesh",
+    mesh,
+    transform: {
+      ...defaultTransform(),
+      position: v3(position[0], position[1] - bounds.min[1], position[2]),
+    },
+    color: color ?? PALETTE[Math.max(0, name.length) % PALETTE.length],
+    visible: true,
+  };
+}
+
 /** Creates a camera that looks at `target` from `position`, at an optional roll. */
 export function createCamera(position: Vec3 = v3(7, 5, 9), target: Vec3 = v3(0, 1, 0)): SceneObject {
   return {
@@ -900,6 +926,35 @@ export function createDemoScene(): Scene {
   // The starter camera is the one you look through.
   camera.camera!.isActive = true;
   return { objects: [cube, camera, sun], activeCameraId: camera.id };
+}
+
+/**
+ * The "3D Starter" template scene — a small Blender/Unity-style diorama:
+ * a ground plane, a few primitives (how they read as silhouette) and two
+ * lights, so the artist opens into a lit, framed world instead of one cube.
+ */
+export function createStarterScene3D(): Scene {
+  const floor = createMeshObject("plane", "Floor", v3(0, -0.02, 0));
+  floor.color = "#3f3f3f";
+  floor.transform.scale = [9, 1, 9];
+
+  const cube = createMeshObject("cube", "Cube", v3(-2.4, 0, -0.6));
+  const sphere = createMeshObject("uv_sphere", "Sphere", v3(0.6, 0, 1.2));
+  const cylinder = createMeshObject("cylinder", "Cylinder", v3(2.7, 0, -0.4));
+  const torus = createMeshObject("torus", "Torus", v3(-0.4, 0, -2.2));
+  const cone = createMeshObject("cone", "Cone", v3(1.9, 0, -2.4));
+  const suzanne = createMeshObject("suzanne", "Suzanne", v3(0.1, 0, 0.2));
+  suzanne.transform.rotation = [0, 25, 0];
+
+  const camera = createCamera(v3(11, 8, 13), v3(0, 1.2, 0));
+  camera.camera!.isActive = true;
+  const sun = createLight("sun", v3(4, 9, 3));
+  const rim = createLight("point", v3(-6, 3, -7), 420);
+
+  return {
+    objects: [floor, cube, sphere, cylinder, torus, cone, suzanne, camera, sun, rim],
+    activeCameraId: camera.id,
+  };
 }
 
 /**
