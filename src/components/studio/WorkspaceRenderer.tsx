@@ -13,6 +13,7 @@ import { NodeEditor } from "@/components/studio/NodeEditor";
 import { ImageEditor } from "@/components/studio/ImageEditor";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
+import { GameLogicEditor } from "@/components/studio/GameLogicEditor";
 import { GamePreview } from "@/components/GamePreview";
 import { GameView, type GameStatus } from "@/components/studio/GameView";
 import { Play } from "lucide-react";
@@ -50,6 +51,8 @@ export interface ViewportSceneProps {
   onCameraOrbit: (dYawDeg: number, dPitchDeg: number) => void;
   onCameraZoom: (factor: number) => void;
   theme?: Viewport3DTheme;
+  /** Blender-like viewport shading mode. */
+  shading: import("@/components/studio/Viewport3D").ViewportShading;
 }
 
 interface LayoutProps {
@@ -106,6 +109,19 @@ interface LayoutProps {
     maximized: boolean;
     onToggleMaximized: () => void;
   };
+  /** Live game-script editing props (Scripting workspace + Animation area). */
+  setConfig?: (cfg: import("@/lib/studioConfig").StudioConfig) => void;
+  onApplyLogic?: () => void;
+  onPlayLogic?: () => void;
+  /** Animation playback state shared with the Timeline / Dope Sheet / viewport. */
+  animFrame: number;
+  animPlaying: boolean;
+  animEnd: number;
+  animKeyFrames: number[];
+  dopeChannels: import("@/components/studio/DopeSheet").DopeChannel[];
+  onAnimFrame: (f: number) => void;
+  onAnimToggle: () => void;
+  onInsertKeyframe: (channel: "pos" | "rot" | "scl") => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -149,7 +165,32 @@ export function WorkspaceRenderer(props: LayoutProps) {
     modeBar,
     addMenu,
     game,
+    setConfig,
+    onApplyLogic,
+    onPlayLogic,
+    animFrame,
+    animPlaying,
+    animEnd,
+    animKeyFrames,
+    dopeChannels,
+    onAnimFrame,
+    onAnimToggle,
+    onInsertKeyframe,
   } = props;
+
+  /** The Timeline at home in every workspace that shows a bottom strip. */
+  const timelineFor = (key: string) => (
+    <Timeline
+      key={key}
+      frame={animFrame}
+      playing={animPlaying}
+      endFrame={animEnd}
+      keyFrames={animKeyFrames}
+      onFrameChange={onAnimFrame}
+      onTogglePlay={onAnimToggle}
+      onInsertKeyframe={onInsertKeyframe}
+    />
+  );
 
   const RenderViewport = (key: string) => (
     <div key={key} className="h-full w-full">
@@ -241,7 +282,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
               </>
             )}
           </div>
-          <Timeline />
+          {timelineFor("timeline")}
         </div>
         {showPanels && (
           <>
@@ -329,25 +370,46 @@ export function WorkspaceRenderer(props: LayoutProps) {
         )}
       </div>
       {workspace === "Animation" ? (
-        <div className="flex min-h-[160px] max-h-[260px] shrink-0 flex-col border-t border-black">
-          <DopeSheet />
-          <Timeline />
+        <div className="flex min-h-[160px] max-h-[300px] shrink-0 flex-col border-t border-black">
+          <div className="flex h-1/2 min-h-0">
+            <DopeSheet
+              frame={animFrame}
+              endFrame={animEnd}
+              channels={dopeChannels}
+              onFrameChange={onAnimFrame}
+            />
+          </div>
+          <div className="flex h-1/2 min-h-0">
+            {timelineFor("timeline-anim")}
+          </div>
         </div>
       ) : workspace === "Rendering" ? (
         <div className="flex h-[180px] shrink-0 border-t border-black">
           <NodeEditor />
         </div>
       ) : workspace === "Scripting" ? (
-        <div className="flex h-[200px] shrink-0 border-t border-black">
-          <ScriptingEditor />
-          <ConsolePanel />
+        <div className="flex h-[264px] shrink-0 border-t border-black">
+          <GameLogicEditor
+            config={config}
+            setConfig={setConfig}
+            onApply={onApplyLogic}
+            onPlay={onPlayLogic}
+          />
+          <div className="flex w-[38%] min-w-[280px] flex-col">
+            <div className="flex min-h-0 flex-1">
+              <ScriptingEditor config={config} setConfig={setConfig} onApply={onApplyLogic} />
+            </div>
+            <div className="flex h-1/2 min-h-[90px] border-t border-[#1d1f23]">
+              <ConsolePanel />
+            </div>
+          </div>
         </div>
       ) : workspace === "Shading" ? (
         <div className="flex h-[200px] shrink-0 border-t border-black">
           <ImageEditor />
         </div>
       ) : (
-        <Timeline />
+        timelineFor("timeline-other")
       )}
     </div>
   );

@@ -24,6 +24,8 @@ export interface GameRecord {
   user_id: string;
   status: string | null;
   is_draft: boolean;
+  /** Editor-only data (source, edit time, serialized 3D scene + animation). */
+  studio_data?: Record<string, unknown> | null;
 }
 
 /**
@@ -60,7 +62,7 @@ export async function loadGamePackage(gameKey: string): Promise<GamePackage> {
 export async function loadGameRecord(gameKey: string): Promise<GameRecord | null> {
   const { data, error } = await supabase
     .from("games")
-    .select("id, game_key, title, description, gameplay, assets, version, released_at, user_id, status, is_draft")
+    .select("id, game_key, title, description, gameplay, assets, version, released_at, user_id, status, is_draft, studio_data")
     .eq("game_key", gameKey)
     .maybeSingle();
 
@@ -83,5 +85,6 @@ export async function loadGameRecord(gameKey: string): Promise<GameRecord | null
     user_id: data.user_id,
     status: data.status,
     is_draft: data.is_draft,
+    studio_data: asRecord(data.studio_data),
   };
 }
