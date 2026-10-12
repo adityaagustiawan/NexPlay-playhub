@@ -54,6 +54,13 @@ import {
   uniqueName,
   v3,
   meshVertexNormals,
+  animationEndFrame,
+  emptyTrack,
+  evaluateObjectAnim,
+  evaluateScene,
+  evaluateTrack,
+  insertKey,
+  insertKeyframe,
   type Vec3,
   type BrushKind,
 } from "@/lib/scene3d";
