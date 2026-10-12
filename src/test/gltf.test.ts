@@ -10,13 +10,27 @@ import {
   v3,
 } from "@/lib/scene3d";
 import {
+  exportFbx,
   exportGlb,
   exportObj,
   exportStl,
+  faceNormal,
   importGlb,
   importObj,
   triangulate,
 } from "@/lib/gltf";
+
+/** Extracts the JSON chunk of a GLB byte array (for structural assertions). */
+function glbJson(bytes: Uint8Array): any {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jlen = dv.getUint32(12, true);
+  return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jlen)));
+}
+
+const hexToRgb = (hex: string): [number, number, number, number] => {
+  const n = parseInt(hex.replace(/^#/, ""), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
+};
 
 /** Builds a minimal GLB with a single triangle (positions + indices). */
 function makeTriangleGlb(): ArrayBuffer {
@@ -97,16 +111,27 @@ describe("GLB import", () => {
   });
 });
 
+describe("faceNormal", () => {
+  it("returns the unit normal of a triangle", () => {
+    const n = faceNormal([0, 0, 0], [1, 0, 0], [0, 1, 0]);
+    expect(n[2]).toBeCloseTo(1, 5);
+    expect(n[0]).toBeCloseTo(0, 5);
+    // degenerate triangle falls back to +Z
+    expect(faceNormal([0, 0, 0], [1, 0, 0], [2, 0, 0])).toEqual([0, 0, 1]);
+  });
+});
+
 describe("GLB export → import round trip", () => {
-  it("keeps mesh count, vertices and triangulated faces", () => {
+  it("keeps mesh count, corner-split vertices and triangulated faces", () => {
     const scene = createDemoScene();
     const bytes = exportGlb(scene, { name: "Demo" });
     const inBytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const meshes = importGlb(inBytes);
     expect(meshes).toHaveLength(1);
     expect(meshes[0].name).toBe("Cube");
-    expect(meshes[0].mesh.vertices).toHaveLength(8);
-    // The demo cube has 6 quads → 12 triangles.
+    // The demo cube has 6 quads → 12 triangles → 36 triangle-corner vertices
+    // (one vertex per corner, needed so each triangle carries a flat normal).
+    expect(meshes[0].mesh.vertices).toHaveLength(36);
     expect(meshes[0].mesh.faces).toHaveLength(12);
     expect(meshes[0].mesh.faces.every((f) => f.length === 3)).toBe(true);
   });
@@ -124,6 +149,55 @@ describe("GLB export → import round trip", () => {
     // 2x scale of a ±0.8 cube around x=+3 ⇒ x∈[1.4, 4.6].
     expect(Math.min(...xs)).toBeCloseTo(1.4, 1);
     expect(Math.max(...xs)).toBeCloseTo(4.6, 1);
+  });
+});
+
+describe("GLB export details (engine readiness)", () => {
+  it("writes NORMAL attributes and per-object coloured materials", () => {
+    const scene = createDemoScene();
+    const json = glbJson(exportGlb(scene, { name: "Demo" }));
+    expect(json.asset.version).toBe("2.0");
+    expect(json.meshes).toHaveLength(1);
+    const prim = json.meshes[0].primitives[0];
+    expect(prim.attributes.POSITION).toBeDefined();
+    expect(prim.attributes.NORMAL).toBeDefined();
+    // 2 accessors per object: POSITION + NORMAL (indices are SCALAR accessor #2)
+    expect(json.accessors).toHaveLength(3);
+    // corner-split cube → 36 positions
+    expect(json.accessors[0].count).toBe(36);
+    expect(json.accessors[0].type).toBe("VEC3");
+    expect(json.accessors[1].type).toBe("VEC3");
+    expect(json.accessors[2].componentType).toBe(5123);
+    // material carries the object colour through to the engine
+    const cube = scene.objects.find((o) => o.name === "Cube")!;
+    expect(json.materials).toHaveLength(1);
+    expect(json.materials[0].name).toContain(cube.name);
+    const col = hexToRgb(cube.color ?? "#000000");
+    json.materials[0].pbrMetallicRoughness.baseColorFactor.forEach((v: number, i: number) =>
+      expect(v).toBeCloseTo(col[i], 2),
+    );
+  });
+
+  it("uses u32 indices when corner-split vertices exceed 65,535", () => {
+    // A big-ish quad grid: 300×70 quads → 42,000 triangles → 126,000 corners.
+    const verts = Array.from({ length: 301 }, (_, x) =>
+      Array.from({ length: 71 }, (_, y) => [x / 10, 0, y / 10]),
+    ).flat();
+    const faces: number[][] = [];
+    for (let x = 0; x < 300; x++)
+      for (let y = 0; y < 70; y++) {
+        const a = x * 71 + y;
+        faces.push([a, a + 71, a + 72, a + 1]);
+      }
+    const scene = createDemoScene();
+    scene.objects = [
+      ...scene.objects.filter((o) => o.kind !== "mesh"),
+      createMeshObjectFromData("Grid", { vertices: verts, faces }),
+    ];
+    const json = glbJson(exportGlb(scene));
+    const idxAcc = json.accessors.find((a: any) => a.type === "SCALAR");
+    expect(idxAcc.componentType).toBe(5125); // UNsigned int
+    expect(idxAcc.count).toBe(126000);
   });
 });
 
