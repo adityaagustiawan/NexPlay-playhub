@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { GameRow } from "@/components/GameRow";
 import { Sparkles, Gamepad2, Clock, CheckCircle2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { PromoBanner } from "@/components/PromoBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPlayTime, listRecentProgress, timeAgo, type GameProgress } from "@/lib/progress";
 
@@ -31,7 +32,7 @@ const Library = () => {
   return (
     <AppLayout>
       {/* Welcome Hero */}
-      <div className="bg-gradient-to-br from-primary/20 via-card to-card border border-border rounded-2xl p-8 mb-8">
+      <div className="bg-gradient-to-br from-primary/20 via-card to-card border border-border rounded-2xl p-8 mb-6">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="font-heading text-3xl font-bold text-foreground mb-2">
@@ -52,6 +53,8 @@ const Library = () => {
           <Gamepad2 className="h-20 w-20 text-primary/30 animate-float hidden lg:block" />
         </div>
       </div>
+
+      <PromoBanner />
 
       {/* Continue Playing — the player's own saved progress, synced to their account */}
       <GameRow

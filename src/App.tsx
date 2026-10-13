@@ -24,6 +24,8 @@ import DevCoins from "./pages/DevCoins";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import Studio from "./pages/Studio";
+import AutumnEvent from "./pages/AutumnEvent";
+import Autumn from "./pages/Autumn";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +53,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<RootRoute />} />
             <Route path="/studio" element={<Studio />} />
+            <Route path="/autumn" element={<Autumn />} />
             <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<FreeTierOnly><Create /></FreeTierOnly>} />
@@ -67,6 +70,8 @@ const App = () => (
               element={<RequireAuth><DevCoins /></RequireAuth>}
             />
             <Route path="/game/:id" element={<GameDetail />} />
+            <Route path="/autumn-event" element={<AutumnEvent />} />
+            <Route path="/autumn" element={<AutumnEvent />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
