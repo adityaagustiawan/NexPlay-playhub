@@ -4,19 +4,18 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface TopBarProps {
   onMenuToggle?: () => void;
-  /** Mirrors the desktop sidebar auto-expand so the bar always abuts it. */
-  sidebarExpanded?: boolean;
+  collapsed?: boolean;
 }
 
-export function TopBar({ onMenuToggle, sidebarExpanded }: TopBarProps) {
+export function TopBar({ onMenuToggle, collapsed = false }: TopBarProps) {
   const { user, profile } = useAuth();
 
+  const headerClass = collapsed
+    ? "fixed top-0 left-0 md:left-[72px] right-0 h-14 bg-sidebar/80 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:px-6 gap-3 transition-[left] duration-200"
+    : "fixed top-0 left-0 md:left-[220px] right-0 h-14 bg-sidebar/80 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:px-6 gap-3 transition-[left] duration-200";
+
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 h-14 bg-sidebar/80 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:px-6 gap-3 transition-[left] duration-200 ${
-        sidebarExpanded ? "md:left-[220px]" : "md:left-[72px]"
-      }`}
-    >
+    <header className={headerClass}>
       {/* Hamburger — mobile only */}
       <button onClick={onMenuToggle} className="md:hidden p-2 text-muted-foreground hover:text-foreground">
         <Menu className="h-5 w-5" />
