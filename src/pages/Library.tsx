@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { GameRow } from "@/components/GameRow";
 import { Sparkles, Gamepad2, Clock, CheckCircle2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { AdBanner } from "@/components/AdBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { formatPlayTime, listRecentProgress, timeAgo, type GameProgress } from "@/lib/progress";
 
