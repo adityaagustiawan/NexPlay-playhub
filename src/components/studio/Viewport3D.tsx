@@ -28,10 +28,12 @@ import {
   cameraBasis,
   findObject,
   faceNormal,
+  meshVertexNormals,
   normalize,
   objectBounds,
   pickObject,
   rayPlaneY,
+  rotateEuler,
   scale as scaleVec,
   sceneBounds,
   selectNear,
@@ -54,6 +56,8 @@ import {
 
 export type ViewName = "front" | "back" | "left" | "right" | "top" | "bottom" | "camera";
 export type TransformMode = "move" | "rotate" | "scale";
+/** Blender-like viewport shading modes. */
+export type ViewportShading = "solid" | "smooth" | "wire" | "mat" | "rend";
 
 export interface Viewport3DTheme {
   bg: string;
@@ -122,6 +126,8 @@ export interface Viewport3DProps {
   /** POV mode: zooms the active camera's lens (factor > 1 = narrower FOV). */
   onCameraZoom?: (factor: number) => void;
   theme?: Viewport3DTheme;
+  /** Blender-like viewport shading: solid / smooth / wire / material / rendered. */
+  shading?: ViewportShading;
 }
 
 /** Everything the canvas handlers read, so they can stay attached once. */
@@ -134,6 +140,7 @@ interface PropsSnapshot {
   brushRadius: number;
   brushStrength: number;
   transformMode: TransformMode;
+  shading: ViewportShading;
   cursor?: Vec3;
   cursorTool: boolean;
   onSelectObject?: (id: string | null) => void;
@@ -209,6 +216,7 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
     onCameraOrbit,
     onCameraZoom,
     theme = DEFAULT_THEME,
+    shading = "solid",
   },
   ref,
 ) {
@@ -228,6 +236,7 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
     brushRadius,
     brushStrength,
     transformMode,
+    shading,
     cursor,
     cursorTool,
     onSelectObject,
@@ -249,6 +258,7 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
     brushRadius,
     brushStrength,
     transformMode,
+    shading,
     cursor,
     cursorTool,
     onSelectObject,
@@ -261,6 +271,13 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
     onCameraOrbit,
     onCameraZoom,
   };
+
+  // Redraw whenever the scene changes: animation playback, imports, undo, etc.
+  // (The canvas handlers only draw on interaction, so a changed scene needs an
+  // explicit repaint or the running animation would never move.)
+  useEffect(() => {
+    drawRef.current();
+  }, [scene]);
 
   /** The camera to render with right now (scene camera when in POV). */
   const currentView = useCallback(() => {
@@ -381,40 +398,104 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
       depth: number;
     };
 
-    const drawMesh = (d: Drawable, selected: boolean, isLightSource: boolean) => {
+    const toRgb = (lum: number[]) =>
+      `rgb(${Math.round(Math.min(1, lum[0]) * 255)},${Math.round(Math.min(1, lum[1]) * 255)},${Math.round(Math.min(1, lum[2]) * 255)})`;
+
+    const drawMesh = (d: Drawable, selected: boolean, isLightSource: boolean, camEye: Vec3) => {
       const { obj, world, faces } = d;
       const proj = world.map(project);
       if (proj.some((p) => p.z < 0)) return;
 
-      type Painted = { pts: Proj[]; avg: number; lum: number[]; fi: number };
+      const shading = propsRef.current.shading;
+      const wireOnly = shading === "wire";
+      // Real backface culling for solid/smooth/material/rendered shading.
+      const cull = !wireOnly;
+      // Vertex normals (rotated into world space) power the smooth shading mode.
+      const vertexNormals =
+        shading === "smooth" && obj.mesh
+          ? meshVertexNormals(obj.mesh.vertices, obj.mesh.faces).map((n) => rotateEuler(n, obj.transform.rotation))
+          : null;
+
+      type Painted = { pts: Proj[]; avg: number; lum: number[]; lums?: number[][]; fi: number };
       const painter: Painted[] = [];
       faces.forEach((face, fi) => {
         const pts = face.map((i) => proj[i]);
         if (pts.some((p) => p.z < 0)) return;
         const avg = pts.reduce((sum, p) => sum + p.z, 0) / pts.length;
-        // Flat face normal is enough for a stylised look and is cheap.
-        const lum = lightContributions(faceNormal(world, face), world);
-        painter.push({ pts, avg, lum, fi });
+        if (cull) {
+          // Skip faces whose normal points away from the camera (like Blender's
+          // solid shading), so closed meshes never show their interior.
+          let cx = 0;
+          let cy = 0;
+          let cz = 0;
+          for (const i of face) {
+            cx += world[i][0];
+            cy += world[i][1];
+            cz += world[i][2];
+          }
+          const n = faceNormal(world, face);
+          const len = face.length;
+          const vx = camEye[0] - cx / len;
+          const vy = camEye[1] - cy / len;
+          const vz = camEye[2] - cz / len;
+          if (n[0] * vx + n[1] * vy + n[2] * vz <= 0) return;
+        }
+        let lum: number[];
+        let lums: number[][] | undefined;
+        if (vertexNormals) {
+          // Gouraud: shade each corner from its own vertex normal.
+          lums = face.map((i) => lightContributions(vertexNormals[i], world));
+          lum = [
+            lums.reduce((s, l) => s + l[0], 0) / lums.length,
+            lums.reduce((s, l) => s + l[1], 0) / lums.length,
+            lums.reduce((s, l) => s + l[2], 0) / lums.length,
+          ];
+        } else {
+          lum = lightContributions(faceNormal(world, face), world);
+        }
+        painter.push({ pts, avg, lum, lums, fi });
       });
       painter.sort((a, b) => b.avg - a.avg);
 
-      // Backface culling keeps the inside of closed meshes from showing.
       for (const face of painter) {
-        const [r, g, b] = face.lum;
         ctx.beginPath();
         ctx.moveTo(face.pts[0].x, face.pts[0].y);
         for (let k = 1; k < face.pts.length; k++) ctx.lineTo(face.pts[k].x, face.pts[k].y);
         ctx.closePath();
-        ctx.fillStyle = isLightSource
-          ? shadeRgb(theme.accent, 1.1)
-          : `rgb(${Math.round(Math.min(1, r) * 255)},${Math.round(Math.min(1, g) * 255)},${Math.round(Math.min(1, b) * 255)})`;
+        if (wireOnly) {
+          // Wireframe: edges only, no fills, no lighting.
+          ctx.strokeStyle = isLightSource
+            ? shadeRgb(theme.accent, 1.1)
+            : selected
+              ? "#ffa028"
+              : shadeRgb(obj.color, 1.12, 0.9);
+          ctx.lineWidth = selected ? 1.6 : 1;
+          ctx.stroke();
+          continue;
+        }
+        if (face.lums) {
+          // Gouraud fill: a linear gradient between darkest and brightest corners.
+          let lo = 0;
+          let hi = 0;
+          const key = (i: number) => face.lums![i][0] + face.lums![i][1] + face.lums![i][2];
+          face.lums.forEach((_, i) => {
+            if (key(i) < key(lo)) lo = i;
+            if (key(i) > key(hi)) hi = i;
+          });
+          const lg = ctx.createLinearGradient(face.pts[lo].x, face.pts[lo].y, face.pts[hi].x, face.pts[hi].y);
+          lg.addColorStop(0, toRgb(face.lums[lo]));
+          lg.addColorStop(1, toRgb(face.lums[hi]));
+          ctx.fillStyle = lg;
+        } else {
+          ctx.fillStyle = isLightSource ? shadeRgb(theme.accent, 1.1) : toRgb(face.lum);
+        }
         ctx.fill();
         ctx.strokeStyle = selected ? "#ffa028" : "rgba(0,0,0,0.35)";
         ctx.lineWidth = selected ? 1.6 : 1;
         ctx.stroke();
       }
 
-      if (selected && !propsRef.current.cameraPov) {
+      if (selected && !propsRef.current.cameraPov && !wireOnly) {
         // Wireframe on top of the selection makes the shape readable.
         ctx.strokeStyle = "rgba(255,200,80,0.5)";
         ctx.lineWidth = 1;
@@ -637,7 +718,7 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
           if (d.obj.kind === "light") drawLightHelper(d.obj);
           continue;
         }
-        drawMesh(d, d.obj.id === propsRef.current.selectedId, d.obj.kind === "light");
+        drawMesh(d, d.obj.id === propsRef.current.selectedId, d.obj.kind === "light", view.eye);
       }
 
       if (propsRef.current.editMode === "edit" || propsRef.current.editMode === "vertexpaint") drawVertices();
