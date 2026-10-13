@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { FreeTierOnly } from "@/components/FreeTierOnly";
+import { SeasonalEventLayer } from "@/components/SeasonalEventLayer";
+import { SeasonalEventLayer } from "@/components/SeasonalEventLayer";
 import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
@@ -45,6 +47,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          {/* Seasonal theme + event effects wrap every page */}
+          <SeasonalEventLayer />
           <Routes>
             <Route path="/" element={<RootRoute />} />
             <Route path="/studio" element={<Studio />} />
