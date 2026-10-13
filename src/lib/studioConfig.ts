@@ -91,3 +91,25 @@ export function buildGameplay(c: StudioConfig): Record<string, unknown> {
     names: c.names,
   };
 }
+
+/** Reverse mapping: engine `gameplay` JSON → editor config (falls back to the named defaults). */
+export function configFromGameplay(
+  gp: Record<string, unknown> | null | undefined,
+  fallback: StudioConfig = DEFAULT_CONFIG,
+): StudioConfig {
+  const g = gp ?? {};
+  return {
+    ...fallback,
+    mode: ["catch", "shooter", "runner"].includes(g.mode as string) ? (g.mode as Mode) : fallback.mode,
+    dimension: g.dimension === "3d" ? "3d" : "2d",
+    difficulty: ["easy", "medium", "hard"].includes(g.difficulty as string)
+      ? (g.difficulty as Difficulty)
+      : fallback.difficulty,
+    levels: Number(g.levels) || fallback.levels,
+    goal: Number(g.goal) || fallback.goal,
+    speed: Number(g.speed) || fallback.speed,
+    spawnMs: Number(g.spawnMs) || fallback.spawnMs,
+    theme: { ...fallback.theme, ...((g.theme as object) ?? {}) },
+    names: { ...fallback.names, ...((g.names as object) ?? {}) },
+  };
+}
