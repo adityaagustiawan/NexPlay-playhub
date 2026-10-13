@@ -93,7 +93,10 @@ async function open3D() {
   const fly = page.locator("[data-add-flyout]");
   await fly.locator("button", { hasText: "Spot" }).first().click();
   await sleep(600);
-  await fly.locator("button", { hasText: "Camera" }).first().click();
+  // Each add closes the flyout; reopen it for the camera.
+  await page.locator('button[title="Add"]').first().click();
+  await sleep(400);
+  await page.locator("[data-add-flyout]").locator("button", { hasText: "Camera" }).first().click();
   await sleep(600);
   const outliner = await page.getByText("SCENE COLLECTION").locator("..").innerText().catch(() => "");
   report.outlinerAfterAdd = outliner.replace(/\n/g, " | ");
