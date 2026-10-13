@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
@@ -17,33 +15,402 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          banned_reason: string | null
           bio: string | null
           coins: number
           created_at: string
           display_name: string | null
+          devcoins: number
           id: string
+          is_banned: boolean
+          public_id: string | null
+          role: string | null
+          creator_tier: string | null
+          suspended_reason: string | null
+          suspended_until: string | null
           updated_at: string
           user_id: string
+          vip_status: string | null
         }
         Insert: {
           avatar_url?: string | null
+          banned_reason?: string | null
           bio?: string | null
           coins?: number
           created_at?: string
           display_name?: string | null
+          devcoins?: number
           id?: string
+          is_banned?: boolean
+          public_id?: string | null
+          role?: string | null
+          creator_tier?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
           updated_at?: string
           user_id: string
+          vip_status?: string | null
         }
         Update: {
           avatar_url?: string | null
+          banned_reason?: string | null
           bio?: string | null
           coins?: number
           created_at?: string
           display_name?: string | null
+          devcoins?: number
           id?: string
+          is_banned?: boolean
+          public_id?: string | null
+          role?: string | null
+          creator_tier?: string | null
+          suspended_reason?: string | null
+          suspended_until?: string | null
           updated_at?: string
           user_id?: string
+          vip_status?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          action: string | null
+          created_at: string
+          id: string
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string
+          id?: string
+          reason: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string
+          id?: string
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      moderation_actions: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          target_user_id: string
+          until: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_user_id: string
+          until?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_user_id?: string
+          until?: string | null
+        }
+        Relationships: []
+      }
+      games: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          image_url: string | null
+          plays: number
+          likes: number
+          favorites: number
+          created_at: string
+          updated_at: string
+          status: string | null
+          studio_data: Json
+          is_draft: boolean
+          engine_type: string | null
+          game_url: string | null
+          external_id: string | null
+          is_external: boolean
+          game_key: string | null
+          gameplay: Json
+          assets: Json
+          version: number
+          released_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          description?: string | null
+          image_url?: string | null
+          plays?: number
+          likes?: number
+          favorites?: number
+          created_at?: string
+          updated_at?: string
+          status?: string | null
+          studio_data?: Json
+          is_draft?: boolean
+          engine_type?: string | null
+          game_url?: string | null
+          external_id?: string | null
+          is_external?: boolean
+          game_key?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          description?: string | null
+          image_url?: string | null
+          plays?: number
+          likes?: number
+          favorites?: number
+          created_at?: string
+          updated_at?: string
+          status?: string | null
+          studio_data?: Json
+          is_draft?: boolean
+          engine_type?: string | null
+          game_url?: string | null
+          external_id?: string | null
+          is_external?: boolean
+          game_key?: string | null
+          gameplay?: Json
+          assets?: Json
+          version?: number
+          released_at?: string | null
+        }
+        Relationships: []
+      }
+      player_progress: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          data: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          data?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scores: {
+        Row: {
+          id: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id: string
+          score: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string
+          score?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      game_items: {
+        Row: {
+          id: string
+          game_id: string
+          creator_id: string
+          name: string
+          description: string | null
+          price_coins: number
+          emoji: string | null
+          category: string | null
+          active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          creator_id: string
+          name: string
+          description?: string | null
+          price_coins?: number
+          emoji?: string | null
+          category?: string | null
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          creator_id?: string
+          name?: string
+          description?: string | null
+          price_coins?: number
+          emoji?: string | null
+          category?: string | null
+          active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      item_purchases: {
+        Row: {
+          id: string
+          item_id: string
+          game_id: string
+          buyer_id: string
+          creator_id: string
+          price_coins: number
+          devcoins_credited: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          game_id: string
+          buyer_id: string
+          creator_id: string
+          price_coins: number
+          devcoins_credited: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          game_id?: string
+          buyer_id?: string
+          creator_id?: string
+          price_coins?: number
+          devcoins_credited?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      devcoin_ledger: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          kind: string
+          balance_after: number
+          note: string | null
+          ref_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          kind: string
+          balance_after: number
+          note?: string | null
+          ref_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          kind?: string
+          balance_after?: number
+          note?: string | null
+          ref_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      devcoin_payouts: {
+        Row: {
+          id: string
+          user_id: string
+          devcoins: number
+          amount_cents: number
+          status: string
+          method: string | null
+          note: string | null
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          devcoins: number
+          amount_cents: number
+          status?: string
+          method?: string | null
+          note?: string | null
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          devcoins?: number
+          amount_cents?: number
+          status?: string
+          method?: string | null
+          note?: string | null
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
         }
         Relationships: []
       }
@@ -172,7 +539,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_game_key: {
+        Args: { slug: string; released_at: string }
+        Returns: string
+      }
+      purchase_game_item: {
+        Args: { p_item_id: string; p_buyer: string }
+        Returns: Json
+      }
+      request_devcoin_payout: {
+        Args: { p_user: string; p_devcoins: number; p_method: string }
+        Returns: Json
+      }
+      resolve_devcoin_payout: {
+        Args: {
+          p_payout_id: string
+          p_admin: string
+          p_approve: boolean
+          p_note: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -184,7 +571,6 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
