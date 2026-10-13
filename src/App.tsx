@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { FreeTierOnly } from "@/components/FreeTierOnly";
+import { SeasonalEventLayer } from "@/components/SeasonalEventLayer";
 import Landing from "./pages/Landing";
 import Library from "./pages/Library";
 import Explore from "./pages/Explore";
@@ -23,6 +24,8 @@ import DevCoins from "./pages/DevCoins";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import Studio from "./pages/Studio";
+import AutumnEvent from "./pages/AutumnEvent";
+import Autumn from "./pages/Autumn";
 
 const queryClient = new QueryClient();
 
@@ -45,9 +48,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          {/* Seasonal theme + event effects wrap every page */}
+          <SeasonalEventLayer />
           <Routes>
             <Route path="/" element={<RootRoute />} />
             <Route path="/studio" element={<Studio />} />
+            <Route path="/autumn" element={<Autumn />} />
             <Route path="/library" element={<Library />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/create" element={<FreeTierOnly><Create /></FreeTierOnly>} />
@@ -64,6 +70,8 @@ const App = () => (
               element={<RequireAuth><DevCoins /></RequireAuth>}
             />
             <Route path="/game/:id" element={<GameDetail />} />
+            <Route path="/autumn-event" element={<AutumnEvent />} />
+            <Route path="/autumn" element={<AutumnEvent />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
