@@ -209,6 +209,12 @@ export function SeasonalEventLayer({ force, showBanner = true }: Props) {
             className="autumn-banner pointer-events-auto mt-2 flex max-w-xl items-center gap-3 rounded-full border border-[hsl(38_96%_56%/0.35)] bg-[hsl(22_20%_12%/0.95)] px-4 py-2 backdrop-blur-md"
             role="status"
             aria-live="polite"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.location.href = "/autumn";
+              }
+            }}
+            style={{ cursor: "pointer" }}
           >
             <span className="autumn-banner-glow flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(24_92%_54%/0.18)]">
               <Leaf className="h-4 w-4 text-[hsl(38_96%_56%)]" />
@@ -228,7 +234,14 @@ export function SeasonalEventLayer({ force, showBanner = true }: Props) {
             </div>
             <button
               type="button"
+<<<<<<< HEAD
               onClick={dismiss}
+=======
+              onClick={(e) => {
+                e.stopPropagation();
+                dismiss();
+              }}
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
               aria-label="Dismiss event banner"
               className="ml-1 rounded-full p-1 text-[hsl(30_12%_62%)] transition-colors hover:bg-[hsl(24_16%_20%)] hover:text-[hsl(32_30%_94%)]"
             >

@@ -168,13 +168,13 @@ const TOOL_TIPS: Record<string, string> = {
 
 const TOOLS = [
   { icon: MousePointer2, label: "Select Box", shortcut: "B", tip: "Box-select objects by dragging in the viewport." },
-  { icon: Circle, label: "Cursor", shortcut: "Shift+Space", tip: "Place the 3D cursor — new objects spawn from it." },
+  { icon: Circle, label: "Cursor", shortcut: "Shift+Space", tip: "Place the 3D cursor — new objects spawn on it (click the floor)." },
   { icon: Move, label: "Move", shortcut: "G", tip: "Grab the selected object and move it." },
   { icon: RotateCw, label: "Rotate", shortcut: "R", tip: "Rotate the selected object around its pivot." },
   { icon: Maximize2, label: "Scale", shortcut: "S", tip: "Resize the selected object." },
   { icon: Ruler, label: "Measure", shortcut: "M", tip: "Measure distances between points in the viewport." },
   { icon: PenTool, label: "Annotate", shortcut: "D", tip: "Draw freehand notes on the viewport." },
-  { icon: Crosshair, label: "Add", shortcut: "Shift+A", tip: "Add a new object at the cursor." },
+  { icon: Crosshair, label: "Add", shortcut: "Shift+A", tip: "Add a mesh, light or camera on the 3D cursor." },
   { icon: Plus, label: "Add Object", tip: "Add a game object — player, pickups or hazards." },
 ];
 
@@ -1581,6 +1581,7 @@ const Studio = () => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+<<<<<<< HEAD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.dimension, deleteSelection, duplicateSelectionAction, duplicateSelectedVertices, gameStatus, modeKey, objectId, insertKeyframeAction, jumpKeyframe, selectAllVertices, stopGame, toggleCameraPov, undo, redo]);
 
@@ -1608,10 +1609,14 @@ const Studio = () => {
   const selectMany2dAction = useCallback((ids: string[]) => {
     setScene2d((s) => selectMany2d(s, ids));
   }, []);
+=======
+  }, [config.dimension, deleteSelection, duplicateSelectionAction, modeKey, selectAllVertices, toggleCameraPov]);
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
 
   // Keyboard shortcuts (Blender-ish): Ctrl+S save, Ctrl+Shift+S update, Ctrl+O open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+<<<<<<< HEAD
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
       if (k === "s") {
@@ -1633,12 +1638,47 @@ const Studio = () => {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+=======
+      if (e.ctrlKey || e.metaKey) {
+        const k = e.key.toLowerCase();
+        if (k === "s") {
+          e.preventDefault();
+          persist(e.shiftKey);
+        } else if (k === "o") {
+          e.preventDefault();
+          refreshMyGames();
+          setOpenDialog(true);
+        } else if (k === "n") {
+          e.preventDefault();
+          newGame();
+        } else if (k === "+" || k === "=") {
+          // Ctrl + + / - zoom the 3D viewport, like most CAD and 3D tools.
+          e.preventDefault();
+          if (config.dimension === "3d") viewportRef.current?.zoom(1.25);
+        } else if (k === "-") {
+          e.preventDefault();
+          if (config.dimension === "3d") viewportRef.current?.zoom(0.8);
+        }
+        return;
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, record, busy, isOwner, user, toggleGamePlay]);
+
+  // Clicking away from the toolbar closes the Add flyout.
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("[data-add-flyout]")) return;
+      setAddMenuOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [addMenuOpen]);
 
   const iconBtn = (on?: boolean) =>
     `flex h-7 w-7 items-center justify-center rounded-[3px] ${
@@ -2015,8 +2055,8 @@ const Studio = () => {
     );
 
   /** The Add menu, shown as a flyout from the toolbar's Add tool. */
-  const addMenuFlyout = (
-    <div className="absolute left-full top-0 z-10 ml-1 w-[190px] rounded-[4px] border border-[#3d3d3d] bg-[#2b2b2b]/98 p-1 shadow-xl">
+  const addMenuFlyout = addMenuOpen ? (
+    <div data-add-flyout className="absolute left-full top-0 z-10 ml-1 w-[190px] rounded-[4px] border border-[#3d3d3d] bg-[#2b2b2b]/98 p-1 shadow-xl">
       <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-[#8a8a8a]">Mesh</div>
       <div className="grid grid-cols-2 gap-0.5">
         {(Object.keys(primitiveLabel) as PrimitiveKind[]).map((kind) => (
@@ -2065,7 +2105,8 @@ const Studio = () => {
         New objects land on the 3D cursor. Pick the Cursor tool and click the floor to move it.
       </p>
     </div>
-  );
+  ) : null;
+
   // ---- Properties content per tab ----
   const gameFields = (
     <>
@@ -2136,7 +2177,122 @@ const Studio = () => {
     </Field>
   );
 
+  /** Transform / camera / light fields for the selected 3D object. */
+  const sceneObjectFields = () => {
+    if (!selectedObject) {
+      return (
+        <>
+          <p className="mb-2 text-[11px] text-[#8f8f8f]">
+            Click an object in the viewport (or the Scene Collection above) to edit it.
+          </p>
+          {gameFields}
+        </>
+      );
+    }
+    const t = selectedObject.transform;
+    return (
+      <>
+        <p className="mb-2 truncate text-[11px] text-[#b0b0b0]">
+          {selectedObject.name} · {selectedObject.kind === "mesh" ? "Mesh" : selectedObject.kind}
+          {selectedObject.mesh ? ` · ${selectedObject.mesh.vertices.length} verts / ${selectedObject.mesh.faces.length} faces` : ""}
+        </p>
+        {(["position", "rotation", "scale"] as const).map((key) => (
+          <Field key={key} label={key === "position" ? "Location" : key === "rotation" ? "Rotation (°)" : "Scale"}>
+            <div className="grid grid-cols-3 gap-1">
+              {([0, 1, 2] as const).map((axis) => (
+                <input
+                  key={axis}
+                  type="number"
+                  step={key === "rotation" ? 5 : 0.1}
+                  value={Number(t[key][axis].toFixed(3))}
+                  aria-label={`${key} ${"XYZ"[axis]}`}
+                  onChange={(e) => setObjectTransform(key, axis, Number(e.target.value))}
+                  className={inputCls}
+                />
+              ))}
+            </div>
+          </Field>
+        ))}
+        {selectedObject.kind === "camera" && (
+          <Field label={`Lens — ${(selectedObject.camera?.fov ?? 50).toFixed(0)}°`}>
+            <input
+              type="range"
+              min={10}
+              max={120}
+              step={1}
+              value={selectedObject.camera?.fov ?? 50}
+              aria-label="Camera FOV"
+              onChange={(e) => {
+                const fov = Number(e.target.value);
+                setScene((s) => patchObject(s, selectedObject.id, { camera: { ...selectedObject.camera!, fov } }));
+              }}
+              className="w-full accent-[#4772b3]"
+            />
+          </Field>
+        )}
+        {selectedObject.kind === "light" && (
+          <>
+            <Field label="Light type">
+              <div className="flex gap-1">
+                {(["point", "sun", "spot"] as LightKind[]).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() =>
+                      setScene((s) => patchObject(s, selectedObject.id, { light: { ...selectedObject.light!, type } }))
+                    }
+                    className={segCls(selectedObject.light?.type === type)}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label={`Energy — ${(selectedObject.light?.energy ?? 800).toFixed(0)}`}>
+              <input
+                type="range"
+                min={0}
+                max={2500}
+                step={50}
+                value={selectedObject.light?.energy ?? 800}
+                aria-label="Light energy"
+                onChange={(e) => {
+                  const energy = Number(e.target.value);
+                  setScene((s) => patchObject(s, selectedObject.id, { light: { ...selectedObject.light!, energy } }));
+                }}
+                className="w-full accent-[#4772b3]"
+              />
+            </Field>
+            <ColorField
+              label="Light color"
+              value={selectedObject.light?.color ?? "#fff2d6"}
+              onChange={(color) => setScene((s) => patchObject(s, selectedObject.id, { light: { ...selectedObject.light!, color } }))}
+            />
+          </>
+        )}
+        <div className="flex gap-1">
+          <button type="button" onClick={duplicateSelectionAction} className="flex-1 rounded-[3px] bg-[#3a3a3a] px-2 py-1 text-[11px] text-[#d0d0d0] hover:bg-[#454545]">
+            Duplicate
+          </button>
+          <button type="button" onClick={deleteSelection} className="flex-1 rounded-[3px] bg-[#3a3a3a] px-2 py-1 text-[11px] text-[#d0d0d0] hover:bg-[#454545]">
+            Delete
+          </button>
+        </div>
+        {selectedObject.kind === "camera" && (
+          <button
+            type="button"
+            onClick={activateSelectedCamera}
+            className="mt-1 w-full rounded-[3px] bg-[#4772b3] px-2 py-1 text-[11px] text-white hover:bg-[#5a85c6]"
+          >
+            Set Active Camera
+          </button>
+        )}
+      </>
+    );
+  };
+
   const objectFields = () => {
+    if (dimension === "3d") return sceneObjectFields();
     if (selected === "player") {
       return (
         <>
@@ -2475,7 +2631,7 @@ const Studio = () => {
             shading={shading}
             headerMenus={headerMenus}
             headerMenusRender={() => null}
-            tools={TOOLS}
+            tools={TOOLS.map((t) => (t.label === "Add" ? { ...t, action: () => setAddMenuOpen((v) => !v) } : t))}
             viewportRef={viewportRef}
             viewportBodyRef={viewportBodyRef}
             onViewportDragOver={(e) => {
@@ -2514,11 +2670,13 @@ const Studio = () => {
               onSelectVertices: (idx) => setSelectedVertices(idx),
               onTransform: handleTransform,
               onSculpt: handleSculpt,
+              onMoveVertices: handleMoveVertices,
               onSetCursor: (p) => setCursor(p),
               setCameraPov: (on) => setCameraPov(on),
               onCameraMove: moveActiveCamera,
               onCameraOrbit: orbitActiveCamera,
               onCameraZoom: zoomActiveCamera,
+              shading: shading as "solid" | "smooth" | "wire" | "mat" | "rend",
             }}
             outlinerObjects={scene.objects}
             selectedObjectId={objectId}
