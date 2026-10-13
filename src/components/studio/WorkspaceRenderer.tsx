@@ -48,6 +48,8 @@ export interface ViewportSceneProps {
   onSelectVertices: (indices: number[]) => void;
   onTransform: (delta: import("@/lib/scene3d").Vec3, mode: "move" | "rotate" | "scale") => void;
   onSculpt: (localPoint: import("@/lib/scene3d").Vec3, delta: import("@/lib/scene3d").Vec3) => void;
+  /** Edit mode: drags the selected vertices by an object-local delta. */
+  onMoveVertices: (localDelta: import("@/lib/scene3d").Vec3) => void;
   onSetCursor: (point: import("@/lib/scene3d").Vec3) => void;
   setCameraPov: (on: boolean) => void;
   /** POV mode camera edits. */
@@ -56,7 +58,7 @@ export interface ViewportSceneProps {
   onCameraZoom: (factor: number) => void;
   theme?: Viewport3DTheme;
   /** Blender-like viewport shading mode. */
-  shading: import("@/components/studio/Viewport3D").ViewportShading;
+  shading?: import("@/components/studio/Viewport3D").ViewportShading;
 }
 
 interface LayoutProps {
@@ -113,37 +115,43 @@ interface LayoutProps {
     maximized: boolean;
     onToggleMaximized: () => void;
   };
-  /** Live game-script editing props (Scripting workspace + Animation area). */
+  /**
+   * Live game-script editing props (Scripting workspace). Passed by the
+   * Scripting panel host; optional so hosts that don't edit scripts still work.
+   */
   setConfig?: (cfg: import("@/lib/studioConfig").StudioConfig) => void;
   onApplyLogic?: () => void;
   onPlayLogic?: () => void;
-  /** Animation playback state shared with the Timeline / Dope Sheet / viewport. */
-  animFrame: number;
-  animPlaying: boolean;
-  animEnd: number;
-  animKeyFrames: number[];
-  dopeChannels: import("@/components/studio/DopeSheet").DopeChannel[];
-  onAnimFrame: (f: number) => void;
-  onAnimToggle: () => void;
-  onInsertKeyframe: (channel: "pos" | "rot" | "scl" | "all") => void;
-  autoKey: boolean;
-  onToggleAutoKey: () => void;
+  /**
+   * Animation playback state shared with the Timeline / Dope Sheet / viewport.
+   * Optional: hosts without an animation track fall back to a static frame 1.
+   */
+  animFrame?: number;
+  animPlaying?: boolean;
+  animEnd?: number;
+  animKeyFrames?: number[];
+  dopeChannels?: import("@/components/studio/DopeSheet").DopeChannel[];
+  onAnimFrame?: (f: number) => void;
+  onAnimToggle?: () => void;
+  onInsertKeyframe?: (channel: "pos" | "rot" | "scl" | "all") => void;
+  autoKey?: boolean;
+  onToggleAutoKey?: () => void;
   // 2D editor props
-  scene2d: import("@/lib/scene2d").Scene2D;
-  onScene2dChange: (patch: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  scene2d?: import("@/lib/scene2d").Scene2D;
+  onScene2dChange?: (patch: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
   /** Structural change or end-of-drag — pushes one undo step. */
-  onScene2dCommit: (patch?: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
-  tool2d: import("@/lib/scene2d").Tool2D;
-  onTool2dChange: (t: import("@/lib/scene2d").Tool2D) => void;
-  localSpace2d: boolean;
-  onLocalSpace2dChange: (v: boolean) => void;
-  onSelect2d: (id: string | null) => void;
-  onSelectMany2d: (ids: string[]) => void;
-  onDeleteSelected2d: () => void;
-  canUndo2d: boolean;
-  canRedo2d: boolean;
-  onUndo2d: () => void;
-  onRedo2d: () => void;
+  onScene2dCommit?: (patch?: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  tool2d?: import("@/lib/scene2d").Tool2D;
+  onTool2dChange?: (t: import("@/lib/scene2d").Tool2D) => void;
+  localSpace2d?: boolean;
+  onLocalSpace2dChange?: (v: boolean) => void;
+  onSelect2d?: (id: string | null) => void;
+  onSelectMany2d?: (ids: string[]) => void;
+  onDeleteSelected2d?: () => void;
+  canUndo2d?: boolean;
+  canRedo2d?: boolean;
+  onUndo2d?: () => void;
+  onRedo2d?: () => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -236,7 +244,7 @@ export function WorkspaceRenderer(props: LayoutProps) {
     <div key={key} className="h-full w-full">
       {dimension === "3d" ? (
         <Viewport3D ref={viewportRef} {...viewport} />
-      ) : (
+      ) : scene2d ? (
         <SpriteEditor
           scene={scene2d}
           tool={tool2d}
@@ -252,6 +260,13 @@ export function WorkspaceRenderer(props: LayoutProps) {
           canRedo={canRedo2d}
           onUndo={onUndo2d}
           onRedo={onRedo2d}
+        />
+      ) : (
+        <GamePreview
+          fill
+          pkg={pkg}
+          title={config.title || "Untitled"}
+          onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined}
         />
       )}
     </div>
