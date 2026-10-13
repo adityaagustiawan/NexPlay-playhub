@@ -234,14 +234,10 @@ export function SeasonalEventLayer({ force, showBanner = true }: Props) {
             </div>
             <button
               type="button"
-<<<<<<< HEAD
-              onClick={dismiss}
-=======
               onClick={(e) => {
                 e.stopPropagation();
                 dismiss();
               }}
->>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
               aria-label="Dismiss event banner"
               className="ml-1 rounded-full p-1 text-[hsl(30_12%_62%)] transition-colors hover:bg-[hsl(24_16%_20%)] hover:text-[hsl(32_30%_94%)]"
             >
