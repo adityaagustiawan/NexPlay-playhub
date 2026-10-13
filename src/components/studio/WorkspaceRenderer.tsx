@@ -11,11 +11,18 @@ import { DopeSheet } from "@/components/studio/DopeSheet";
 import { GraphEditor } from "@/components/studio/GraphEditor";
 import { NodeEditor } from "@/components/studio/NodeEditor";
 import { ImageEditor } from "@/components/studio/ImageEditor";
+import { SpriteEditor } from "./SpriteEditor";
+import { Viewport2D } from "./Viewport2D";
 import { ConsolePanel } from "@/components/studio/ConsolePanel";
 import { ScriptingEditor } from "@/components/studio/ScriptingEditor";
+import { GameLogicEditor } from "@/components/studio/GameLogicEditor";
 import { GamePreview } from "@/components/GamePreview";
+import { GameView, type GameStatus } from "@/components/studio/GameView";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import type { GamePackage } from "@/engine/gameLoader";
+import type { GameRecord } from "@/engine/gameLoader";
+import type { StudioConfig } from "@/lib/studioConfig";
+import type { LucideIcon } from "lucide-react";
 import type { SceneObject } from "@/lib/scene3d";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode, RefObject } from "react";
@@ -41,6 +48,8 @@ export interface ViewportSceneProps {
   onSelectVertices: (indices: number[]) => void;
   onTransform: (delta: import("@/lib/scene3d").Vec3, mode: "move" | "rotate" | "scale") => void;
   onSculpt: (localPoint: import("@/lib/scene3d").Vec3, delta: import("@/lib/scene3d").Vec3) => void;
+  /** Edit mode: drags the selected vertices by an object-local delta. */
+  onMoveVertices: (localDelta: import("@/lib/scene3d").Vec3) => void;
   onSetCursor: (point: import("@/lib/scene3d").Vec3) => void;
   setCameraPov: (on: boolean) => void;
   /** POV mode camera edits. */
@@ -48,13 +57,15 @@ export interface ViewportSceneProps {
   onCameraOrbit: (dYawDeg: number, dPitchDeg: number) => void;
   onCameraZoom: (factor: number) => void;
   theme?: Viewport3DTheme;
+  /** Blender-like viewport shading mode. */
+  shading?: import("@/components/studio/Viewport3D").ViewportShading;
 }
 
 interface LayoutProps {
   workspace: Workspace;
-  config: any;
+  config: StudioConfig;
   pkg: GamePackage;
-  record?: any | null;
+  record?: GameRecord | null;
   dimension: "2d" | "3d";
   nonce: number;
   selected: OutlinerKey;
@@ -69,11 +80,14 @@ interface LayoutProps {
   tool: string;
   setTool: (t: string) => void;
   shading: string;
-  headerMenus: { label: string; items: any[] }[];
+  headerMenus: { label: string; items: StudioMenuEntry[] }[];
   headerMenusRender: () => ReactNode;
-  tools: { icon: any; label: string; tip?: string; shortcut?: string; action?: () => void }[];
+  tools: { icon: LucideIcon; label: string; tip?: string; shortcut?: string; action?: () => void }[];
   viewportRef: RefObject<Viewport3DHandle>;
   viewportBodyRef: RefObject<HTMLDivElement>;
+  /** Optional drag-&-drop import handlers attached to the 3D viewport body. */
+  onViewportDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onViewportDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   setEditMode?: (m: string) => void;
   panelWidth: number;
   setPanelWidth: (n: number) => void;
@@ -91,6 +105,47 @@ interface LayoutProps {
   modeBar?: ReactNode;
   /** Flyout opened by the toolbar's Add tool. */
   addMenu?: ReactNode;
+  /** Unity-style Game view: set status to "playing"/"paused" to swap the
+   * viewport for a live run of the game (Play mode). */
+  game?: {
+    status: GameStatus;
+    pkg: GamePackage;
+    title?: string;
+    onStatusChange: (s: GameStatus) => void;
+    maximized: boolean;
+    onToggleMaximized: () => void;
+  };
+  /** Live game-script editing props (Scripting workspace + Animation area). */
+  setConfig?: (cfg: import("@/lib/studioConfig").StudioConfig) => void;
+  onApplyLogic?: () => void;
+  onPlayLogic?: () => void;
+  /** Animation playback state shared with the Timeline / Dope Sheet / viewport. */
+  animFrame: number;
+  animPlaying: boolean;
+  animEnd: number;
+  animKeyFrames: number[];
+  dopeChannels: import("@/components/studio/DopeSheet").DopeChannel[];
+  onAnimFrame: (f: number) => void;
+  onAnimToggle: () => void;
+  onInsertKeyframe: (channel: "pos" | "rot" | "scl" | "all") => void;
+  autoKey: boolean;
+  onToggleAutoKey: () => void;
+  // 2D editor props
+  scene2d: import("@/lib/scene2d").Scene2D;
+  onScene2dChange: (patch: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  /** Structural change or end-of-drag — pushes one undo step. */
+  onScene2dCommit: (patch?: (s: import("@/lib/scene2d").Scene2D) => import("@/lib/scene2d").Scene2D) => void;
+  tool2d: import("@/lib/scene2d").Tool2D;
+  onTool2dChange: (t: import("@/lib/scene2d").Tool2D) => void;
+  localSpace2d: boolean;
+  onLocalSpace2dChange: (v: boolean) => void;
+  onSelect2d: (id: string | null) => void;
+  onSelectMany2d: (ids: string[]) => void;
+  onDeleteSelected2d: () => void;
+  canUndo2d: boolean;
+  canRedo2d: boolean;
+  onUndo2d: () => void;
+  onRedo2d: () => void;
 }
 
 export function WorkspaceRenderer(props: LayoutProps) {
@@ -118,6 +173,8 @@ export function WorkspaceRenderer(props: LayoutProps) {
     tools,
     viewportRef,
     viewportBodyRef,
+    onViewportDragOver,
+    onViewportDrop,
     setEditMode,
     panelWidth,
     setPanelWidth,
@@ -131,14 +188,73 @@ export function WorkspaceRenderer(props: LayoutProps) {
     onToggleObjectVisible,
     modeBar,
     addMenu,
+    game,
+    setConfig,
+    onApplyLogic,
+    onPlayLogic,
+    animFrame,
+    animPlaying,
+    animEnd,
+    animKeyFrames,
+    dopeChannels,
+    onAnimFrame,
+    onAnimToggle,
+    onInsertKeyframe,
+    autoKey,
+    onToggleAutoKey,
+    scene2d,
+    onScene2dChange,
+    onScene2dCommit,
+    tool2d,
+    onTool2dChange,
+    localSpace2d,
+    onLocalSpace2dChange,
+    onSelect2d,
+    onSelectMany2d,
+    onDeleteSelected2d,
+    canUndo2d,
+    canRedo2d,
+    onUndo2d,
+    onRedo2d,
   } = props;
+
+  /** The Timeline at home in every workspace that shows a bottom strip. */
+  const timelineFor = (key: string) => (
+    <Timeline
+      key={key}
+      frame={animFrame}
+      playing={animPlaying}
+      autoKey={autoKey}
+      endFrame={animEnd}
+      keyFrames={animKeyFrames}
+      onFrameChange={onAnimFrame}
+      onTogglePlay={onAnimToggle}
+      onToggleAutoKey={onToggleAutoKey}
+      onInsertKeyframe={onInsertKeyframe}
+    />
+  );
 
   const RenderViewport = (key: string) => (
     <div key={key} className="h-full w-full">
       {dimension === "3d" ? (
         <Viewport3D ref={viewportRef} {...viewport} />
       ) : (
-        <GamePreview fill pkg={pkg} title={config.title || "Untitled"} onOpenFull={record ? () => navigate(`/play/${record.game_key}`) : undefined} />
+        <SpriteEditor
+          scene={scene2d}
+          tool={tool2d}
+          onToolChange={onTool2dChange}
+          localSpace={localSpace2d}
+          onLocalSpaceChange={onLocalSpace2dChange}
+          onChange={onScene2dChange}
+          onCommit={onScene2dCommit}
+          onSelect={onSelect2d}
+          onSelectMany={onSelectMany2d}
+          onDeleteSelected={onDeleteSelected2d}
+          canUndo={canUndo2d}
+          canRedo={canRedo2d}
+          onUndo={onUndo2d}
+          onRedo={onRedo2d}
+        />
       )}
     </div>
   );
@@ -168,38 +284,51 @@ export function WorkspaceRenderer(props: LayoutProps) {
             {headerMenusRender()}
           </div>
           {modeBar}
-          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
-            {showToolbar && (
-              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-                {tools.map((t) => {
-                  const Icon = t.icon;
-                  return (
-                    <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
-                      <button
-                        type="button"
-                        title={t.label}
-                        onClick={() => (t.action ? t.action() : setTool(t.label))}
-                        className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </button>
-                    </Tip>
-                  );
-                })}
-                {addMenu}
-              </div>
+          <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]" onDragOver={onViewportDragOver} onDrop={onViewportDrop}>
+            {game && game.status !== "stopped" ? (
+              <GameView
+                pkg={game.pkg}
+                title={game.title}
+                status={game.status}
+                onChange={game.onStatusChange}
+                maximized={game.maximized}
+                onToggleMaximized={game.onToggleMaximized}
+              />
+            ) : (
+              <>
+                {showToolbar && (
+                  <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                    {tools.map((t) => {
+                      const Icon = t.icon;
+                      return (
+                        <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
+                          <button
+                            type="button"
+                            title={t.label}
+                            onClick={() => (t.action ? t.action() : setTool(t.label))}
+                            className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </button>
+                        </Tip>
+                      );
+                    })}
+                    {addMenu}
+                  </div>
+                )}
+                <div className={`pointer-events-none absolute top-2 z-10 text-[11px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
+                  (1) Scene Collection | {editMode}
+                </div>
+                <div className={`pointer-events-none absolute bottom-2 z-10 text-[11px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
+                  {dimension === "3d"
+                    ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel or pinch: zoom"
+                    : `${config.mode} view · ${dimension.toUpperCase()}`}
+                </div>
+                {RenderViewport(`${dimension}-${nonce}`)}
+              </>
             )}
-            <div className={`pointer-events-none absolute top-2 z-10 text-[11px] text-[#b0b0b0] ${showToolbar ? "left-11" : "left-2"}`}>
-              (1) Scene Collection | {editMode}
-            </div>
-            <div className={`pointer-events-none absolute bottom-2 z-10 text-[11px] text-[#8f8f8f] ${showToolbar ? "left-11" : "left-2"}`}>
-              {dimension === "3d"
-                ? "Drag: orbit · Right-drag/Shift-drag: pan · Wheel or pinch: zoom"
-                : `${config.mode} view · ${dimension.toUpperCase()}`}
-            </div>
-            {RenderViewport(`${dimension}-${nonce}`)}
           </div>
-          <Timeline />
+          {timelineFor("timeline")}
         </div>
         {showPanels && (
           <>
@@ -239,49 +368,102 @@ export function WorkspaceRenderer(props: LayoutProps) {
   const left = (
     <div className="flex min-h-0 flex-1 flex-col">
       {modeBar}
-      <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]">
-        {showToolbar && (
-          <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
-            {tools.map((t) => {
-              const Icon = t.icon;
-              return (
-                <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
-                  <button
-                    type="button"
-                    title={t.label}
-                    onClick={() => (t.action ? t.action() : setTool(t.label))}
-                    className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </button>
-                </Tip>
-              );
-            })}
-            {addMenu}
-          </div>
+      <div ref={viewportBodyRef} className="relative min-h-0 flex-1 bg-[#2b2b2b]" onDragOver={onViewportDragOver} onDrop={onViewportDrop}>
+        {game && game.status !== "stopped" ? (
+          <GameView
+            pkg={game.pkg}
+            title={game.title}
+            status={game.status}
+            onChange={game.onStatusChange}
+            maximized={game.maximized}
+            onToggleMaximized={game.onToggleMaximized}
+          />
+        ) : (
+          <>
+            {showToolbar && (
+              <div className="absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-[4px] bg-[#303030]/95 p-1 shadow-lg">
+                {tools.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <Tip key={t.label} label={t.label} description={t.tip} shortcut={t.shortcut} enabled={showTips} side="right">
+                      <button
+                        type="button"
+                        title={t.label}
+                        onClick={() => (t.action ? t.action() : setTool(t.label))}
+                        className={`flex h-7 w-7 items-center justify-center rounded-[3px] ${tool === t.label ? "bg-[#4772b3] text-white" : "text-[#b0b0b0] hover:bg-[#3a3a3a]"}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    </Tip>
+                  );
+                })}
+                {addMenu}
+              </div>
+            )}
+            {RenderViewport(`${dimension}-${nonce}`)}
+          </>
         )}
-        {RenderViewport(`${dimension}-${nonce}`)}
       </div>
       {workspace === "Animation" ? (
-        <div className="flex min-h-[160px] max-h-[260px] shrink-0 flex-col border-t border-black">
-          <DopeSheet />
-          <Timeline />
+        <div className="flex min-h-[160px] max-h-[300px] shrink-0 flex-col border-t border-black">
+          <div className="flex h-1/2 min-h-0">
+            <DopeSheet
+              frame={animFrame}
+              endFrame={animEnd}
+              channels={dopeChannels}
+              onFrameChange={onAnimFrame}
+            />
+          </div>
+          <div className="flex h-1/2 min-h-0">
+            {timelineFor("timeline-anim")}
+          </div>
         </div>
       ) : workspace === "Rendering" ? (
         <div className="flex h-[180px] shrink-0 border-t border-black">
           <NodeEditor />
         </div>
       ) : workspace === "Scripting" ? (
-        <div className="flex h-[200px] shrink-0 border-t border-black">
-          <ScriptingEditor />
-          <ConsolePanel />
+        <div className="flex h-[264px] shrink-0 border-t border-black">
+          <GameLogicEditor
+            config={config}
+            setConfig={setConfig}
+            onApply={onApplyLogic}
+            onPlay={onPlayLogic}
+          />
+          <div className="flex w-[38%] min-w-[280px] flex-col">
+            <div className="flex min-h-0 flex-1">
+              <ScriptingEditor config={config} setConfig={setConfig} onApply={onApplyLogic} />
+            </div>
+            <div className="flex h-1/2 min-h-[90px] border-t border-[#1d1f23]">
+              <ConsolePanel />
+            </div>
+          </div>
         </div>
       ) : workspace === "Shading" ? (
         <div className="flex h-[200px] shrink-0 border-t border-black">
-          <ImageEditor />
+          {dimension === "2d" ? (
+            <SpriteEditor
+              scene={scene2d}
+              tool={tool2d}
+              onToolChange={onTool2dChange}
+              localSpace={localSpace2d}
+              onLocalSpaceChange={onLocalSpace2dChange}
+              onChange={onScene2dChange}
+              onCommit={onScene2dCommit}
+              onSelect={onSelect2d}
+              onSelectMany={onSelectMany2d}
+              onDeleteSelected={onDeleteSelected2d}
+              canUndo={canUndo2d}
+              canRedo={canRedo2d}
+              onUndo={onUndo2d}
+              onRedo={onRedo2d}
+            />
+          ) : (
+            <ImageEditor />
+          )}
         </div>
       ) : (
-        <Timeline />
+        timelineFor("timeline-other")
       )}
     </div>
   );

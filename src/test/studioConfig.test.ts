@@ -3,6 +3,7 @@ import {
   DEFAULT_CONFIG,
   buildGameplay,
   clampNumber,
+  configFromGameplay,
   slugify,
   GOOD_LABEL,
   BAD_LABEL,
@@ -78,5 +79,38 @@ describe("labels", () => {
       expect(GOOD_LABEL[mode]).toBeTruthy();
       expect(BAD_LABEL[mode]).toBeTruthy();
     }
+  });
+});
+
+describe("configFromGameplay", () => {
+  it("reverse-maps an engine gameplay payload back to the editor config", () => {
+    const gp = buildGameplay({
+      ...DEFAULT_CONFIG,
+      mode: "runner",
+      difficulty: "easy",
+      levels: 3,
+      goal: 40,
+      speed: 2.2,
+      spawnMs: 700,
+      theme: { ...DEFAULT_CONFIG.theme, bg: "#112233" },
+      names: { ...DEFAULT_CONFIG.names, player: "Rex" },
+    });
+    const back = configFromGameplay(gp, DEFAULT_CONFIG);
+    expect(back.mode).toBe("runner");
+    expect(back.difficulty).toBe("easy");
+    expect(back.levels).toBe(3);
+    expect(back.goal).toBe(40);
+    expect(back.spawnMs).toBe(700);
+    expect(back.theme.bg).toBe("#112233");
+    expect(back.names.player).toBe("Rex");
+    expect(back.title).toBe(DEFAULT_CONFIG.title);
+  });
+
+  it("falls back to safe defaults for malformed or empty payloads", () => {
+    expect(configFromGameplay(null, DEFAULT_CONFIG).mode).toBe(DEFAULT_CONFIG.mode);
+    const weird = configFromGameplay({ mode: "hockey", levels: "nope", theme: null }, DEFAULT_CONFIG);
+    expect(weird.mode).toBe(DEFAULT_CONFIG.mode);
+    expect(weird.levels).toBe(DEFAULT_CONFIG.levels);
+    expect(weird.theme.bg).toBe(DEFAULT_CONFIG.theme.bg);
   });
 });
