@@ -72,6 +72,7 @@ export function resolveTheme(
   now: Date,
   search = typeof window !== "undefined" ? window.location.search : "",
 ): { theme: ThemeId; event: SeasonalEvent | null } {
+<<<<<<< HEAD
   // Explicit override: ?event=<id>|off|default, else the stored preference.
   const param = new URLSearchParams(search).get("event");
   const forced = (param ?? readStorage() ?? "").toLowerCase().trim();
@@ -79,6 +80,12 @@ export function resolveTheme(
   const forcedEvent = findEvent(forced);
   if (forcedEvent) return { theme: forcedEvent.id, event: forcedEvent };
   // No override — use the date window.
+=======
+  const param = new URLSearchParams(search).get("event");
+  const forced = param ? param.toLowerCase() : readStorage();
+  if (forced === "off" || forced === "default") return { theme: "default", event: null };
+  if (forced === "autumn") return { theme: "autumn", event: AUTUMN_EVENT };
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
   const event = getActiveEvent(now);
   return { theme: event ? event.id : "default", event };
 }

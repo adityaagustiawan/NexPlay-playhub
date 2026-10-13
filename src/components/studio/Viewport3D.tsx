@@ -277,7 +277,10 @@ export const Viewport3D = forwardRef<Viewport3DHandle, Viewport3DProps>(function
   // explicit repaint or the running animation would never move.)
   useEffect(() => {
     drawRef.current();
+<<<<<<< HEAD
     // eslint-disable-next-line react-hooks/exhaustive-deps
+=======
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
   }, [scene]);
 
   /** The camera to render with right now (scene camera when in POV). */

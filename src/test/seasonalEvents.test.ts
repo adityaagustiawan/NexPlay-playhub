@@ -221,8 +221,13 @@ describe("registry integrity", () => {
 describe("prefersReducedMotion", () => {
   it("returns false when matchMedia is unavailable", () => {
     const original = window.matchMedia;
+<<<<<<< HEAD
     const holder = window as unknown as { matchMedia?: typeof window.matchMedia };
     delete holder.matchMedia;
+=======
+    // @ts-expect-error -- deliberately removing the API
+    delete window.matchMedia;
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
     try {
       expect(prefersReducedMotion()).toBe(false);
     } finally {
@@ -231,6 +236,7 @@ describe("prefersReducedMotion", () => {
   });
 
   it("reads the media query when available", () => {
+<<<<<<< HEAD
     const original = window.matchMedia;
     window.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q })) as typeof window.matchMedia;
     try {
@@ -238,5 +244,9 @@ describe("prefersReducedMotion", () => {
     } finally {
       window.matchMedia = original;
     }
+=======
+    window.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q })) as typeof window.matchMedia;
+    expect(prefersReducedMotion()).toBe(true);
+>>>>>>> 64e9947 (feat: add autumn theme, event pages, and promo banner on library)
   });
 });
