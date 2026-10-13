@@ -271,3 +271,154 @@
 .build-scan {
   animation: build-scan 1.1s ease-in-out infinite;
 }
+
+/* ==========================================================================
+   Seasonal events — Autumn
+   The Autumn Event swaps the palette via [data-theme="autumn"] and adds
+   falling-leaf effects. All colours stay in the same HSL-variable contract
+   the rest of the app already uses, so every page re-themes for free.
+   ========================================================================== */
+
+:root[data-theme="autumn"] {
+  /* Warm dark brown base instead of the default indigo */
+  --background: 22 22% 8%;
+  --foreground: 32 30% 94%;
+
+  --card: 20 18% 13%;
+  --card-foreground: 32 30% 94%;
+
+  --popover: 20 18% 11%;
+  --popover-foreground: 32 30% 94%;
+
+  /* Pumpkin orange replaces the purple primary */
+  --primary: 24 92% 54%;
+  --primary-foreground: 22 30% 8%;
+  --primary-glow: 28 95% 62%;
+
+  --secondary: 20 14% 17%;
+  --secondary-foreground: 32 30% 94%;
+
+  --muted: 20 12% 19%;
+  --muted-foreground: 30 12% 58%;
+
+  /* Amber / maple accent */
+  --accent: 38 96% 56%;
+  --accent-foreground: 22 30% 8%;
+
+  --destructive: 4 78% 56%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 24 16% 20%;
+  --input: 24 16% 20%;
+  --ring: 24 92% 54%;
+
+  --sidebar-background: 22 20% 10%;
+  --sidebar-foreground: 32 30% 94%;
+  --sidebar-primary: 24 92% 54%;
+  --sidebar-primary-foreground: 22 30% 8%;
+  --sidebar-accent: 20 14% 17%;
+  --sidebar-accent-foreground: 32 30% 94%;
+  --sidebar-border: 24 16% 20%;
+  --sidebar-ring: 24 92% 54%;
+
+  --success: 96 45% 45%;
+
+  /* Autumn-only extras */
+  --leaf-1: 24 92% 54%;   /* pumpkin */
+  --leaf-2: 12 82% 46%;   /* maple red */
+  --leaf-3: 38 96% 56%;   /* amber */
+  --leaf-4: 32 62% 40%;   /* ochre */
+}
+
+/* Autumn hero glows: warm embers instead of the cold indigo bloom */
+:root[data-theme="autumn"] .glow-drift {
+  animation-duration: 9s;
+}
+
+/* ---- Falling leaves ---- */
+@keyframes leaf-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--leaf-opacity, 0.85);
+  }
+  100% {
+    transform: translate3d(var(--leaf-drift, 6vw), 112vh, 0) rotate(var(--leaf-spin, 540deg));
+    opacity: 0;
+  }
+}
+
+@keyframes leaf-sway {
+  0%, 100% { transform: translateX(-14px); }
+  50% { transform: translateX(14px); }
+}
+
+.leaf-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.leaf {
+  position: absolute;
+  top: 0;
+  width: var(--leaf-size, 14px);
+  height: var(--leaf-size, 14px);
+  animation: leaf-fall var(--leaf-duration, 11s) linear infinite;
+  animation-delay: var(--leaf-delay, 0s);
+  will-change: transform, opacity;
+}
+
+.leaf svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* gentle horizontal sway on top of the fall */
+  animation: leaf-sway var(--leaf-sway-duration, 3.4s) ease-in-out infinite alternate;
+}
+
+/* A soft warm vignette so the page feels sunlit */
+:root[data-theme="autumn"] .autumn-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 39;
+  background:
+    radial-gradient(120% 80% at 50% -10%, hsl(38 96% 56% / 0.10), transparent 60%),
+    radial-gradient(100% 70% at 50% 110%, hsl(12 82% 46% / 0.08), transparent 65%);
+}
+
+/* Event banner entrance */
+@keyframes autumn-banner-in {
+  from { transform: translateY(-14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.autumn-banner {
+  animation: autumn-banner-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes autumn-banner-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(38 96% 56% / 0.45); }
+  50% { box-shadow: 0 0 0 5px hsl(38 96% 56% / 0); }
+}
+
+.autumn-banner-glow {
+  animation: autumn-banner-glow 2s ease-in-out infinite;
+}
+
+/* Respect reduced-motion: keep the theme, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .leaf,
+  .leaf svg,
+  :root[data-theme="autumn"] .glow-drift {
+    animation: none !important;
+  }
+  .leaf { display: none; }
+  .autumn-banner { animation: none; }
+  .autumn-banner-glow { animation: none; }
+}
