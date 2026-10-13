@@ -26,6 +26,31 @@ import {
 } from "@/lib/studioConfig";
 import { GamePreview } from "@/components/GamePreview";
 import { Viewport3D, type Viewport3DHandle } from "@/components/studio/Viewport3D";
+import {
+  activeCamera,
+  addObject,
+  createCamera,
+  createDemoScene,
+  createLight,
+  createMeshObject,
+  deleteVertices,
+  deserializeScene,
+  duplicateSelection,
+  findObject,
+  moveVertices,
+  patchObject,
+  removeObject,
+  scaleSelection,
+  sculpt,
+  serializeScene,
+  setActiveCamera,
+  uniqueName,
+  v3,
+  type LightKind,
+  type PrimitiveKind,
+  type Scene,
+  type Vec3,
+} from "@/lib/scene3d";
 import { StudioMenu, type StudioMenuEntry } from "@/components/studio/StudioMenu";
 import { Outliner, type OutlinerKey } from "@/components/studio/Outliner";
 import { PropertiesPanel, type PropTab } from "@/components/studio/PropertiesPanel";
@@ -77,6 +102,22 @@ const WORKSPACES = ["Layout", "Modeling", "Shading", "Animation", "Rendering", "
 
 // Minimum time the "asset import" build overlay stays visible when saving.
 const BUILD_MIN_MS = 1600;
+
+/** Display label for an addable primitive. */
+const primitiveLabel = (kind: PrimitiveKind): string =>
+  ({
+    cube: "Cube",
+    uv_sphere: "UV Sphere",
+    ico_sphere: "Ico Sphere",
+    cylinder: "Cylinder",
+    cone: "Cone",
+    plane: "Plane",
+    torus: "Torus",
+    suzanne: "Suzanne",
+  })[kind];
+
+/** Keeps object scale inside a sane range so gizmo drags can't explode. */
+const clampScale = (v: number) => Math.max(0.02, Math.min(40, v));
 
 const TOOL_TIPS: Record<string, string> = {
   Layout: "Model, script and preview — the default Blender-style layout.",
@@ -178,6 +219,15 @@ const Studio = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OutlinerKey>("game");
+
+  // ---- 3D scene (the Blender-like editor) ----
+  const [scene, setScene] = useState<Scene>(() => createDemoScene());
+  const [objectId, setObjectId] = useState<string | null>(null);
+  const [selectedVertices, setSelectedVertices] = useState<number[]>([]);
+  const [cameraPov, setCameraPov] = useState(false);
+  const [brush, setBrush] = useState<string>("draw");
+  const [brushRadius, setBrushRadius] = useState(1.6);
+  const [brushStrength, setBrushStrength] = useState(0.4);
 
   // Shell state
   const [workspace, setWorkspace] = useState("Layout");
@@ -307,6 +357,151 @@ const Studio = () => {
     setNames: (k: keyof StudioConfig["names"], v: string) =>
       setConfig((c) => ({ ...c, names: { ...c.names, [k]: v } })),
   };
+
+  // ---- 3D scene actions (Blender-style Add, delete, transform, sculpt) ----
+
+  const selectedObject = findObject(scene, objectId);
+
+  /** Adds a primitive from the Add menu at the 3D cursor (the origin). */
+  const addPrimitive = useCallback((kind: PrimitiveKind) => {
+    setScene((s) => addObject(s, createMeshObject(kind, primitiveLabel(kind), v3(0, 1, 0))));
+    setNotice(`Added ${primitiveLabel(kind)}.`);
+  }, []);
+
+  const addLightObject = useCallback((type: LightKind) => {
+    setScene((s) => addObject(s, createLight(type, v3(4, 6, 3))));
+    setNotice(`Added ${type} light.`);
+  }, []);
+
+  const addCameraObject = useCallback(() => {
+    setScene((s) => addObject(s, createCamera(v3(7, 5, 9))));
+    setNotice("Added camera.");
+  }, []);
+
+  const deleteSelectedObject = useCallback(() => {
+    if (!objectId) {
+      setNotice("Select an object first.");
+      return;
+    }
+    setScene((s) => removeObject(s, objectId));
+    setObjectId(null);
+    setSelectedVertices([]);
+    setNotice("Deleted object.");
+  }, [objectId]);
+
+  /** Makes the selected camera the one the viewport looks through. */
+  const makeActiveCamera = useCallback((id: string) => {
+    setScene((s) => setActiveCamera(s, id));
+    setNotice("Active camera set — the viewport can now view its POV.");
+  }, []);
+
+  const duplicateSelectedObject = useCallback(() => {
+    if (!selectedObject) return;
+    setScene((s) => {
+      const copy = createMeshObject(
+        selectedObject.primitive ?? "cube",
+        selectedObject.name,
+        v3(
+          selectedObject.transform.position[0] + 1.5,
+          selectedObject.transform.position[1],
+          selectedObject.transform.position[2] + 1.5,
+        ),
+      );
+      // Carry the visual settings across so the duplicate looks right away.
+      return {
+        ...s,
+        objects: [
+          ...s.objects,
+          { ...copy, color: selectedObject.color, role: selectedObject.role },
+        ],
+      };
+    });
+    setNotice("Duplicated object.");
+  }, [selectedObject]);
+
+  /** Gizmo drag: move / rotate / scale the selected object. */
+  const handleTransform = useCallback(
+    (delta: Vec3, mode: "move" | "rotate" | "scale") => {
+      if (!objectId || !selectedObject) return;
+      setScene((s) => {
+        const obj = findObject(s, objectId);
+        if (!obj) return s;
+        if (mode === "move") {
+          return patchObject(s, objectId, {
+            transform: {
+              ...obj.transform,
+              position: [
+                obj.transform.position[0] + delta[0],
+                obj.transform.position[1] + delta[1],
+                obj.transform.position[2] + delta[2],
+              ],
+            },
+          });
+        }
+        if (mode === "rotate") {
+          return patchObject(s, objectId, {
+            transform: {
+              ...obj.transform,
+              rotation: [
+                obj.transform.rotation[0] + delta[0] * 40,
+                obj.transform.rotation[1] + delta[1] * 40,
+                obj.transform.rotation[2] + delta[2] * 40,
+              ],
+            },
+          });
+        }
+        const f = 1 + (delta[0] + delta[1] + delta[2]) * 0.55;
+        return patchObject(s, objectId, {
+          transform: {
+            ...obj.transform,
+            scale: [
+              clampScale(obj.transform.scale[0] * f),
+              clampScale(obj.transform.scale[1] * f),
+              clampScale(obj.transform.scale[2] * f),
+            ],
+          },
+        });
+      });
+    },
+    [objectId, selectedObject],
+  );
+
+  /** Sculpt stroke: deform the selected mesh's vertices around the hit. */
+  const handleSculpt = useCallback(
+    (localPoint: Vec3, delta: Vec3) => {
+      if (!objectId) return;
+      setScene((s) => {
+        const obj = findObject(s, objectId);
+        if (!obj?.mesh) return s;
+        const shaped = sculpt(obj, localPoint, delta, {
+          brush: brush as "draw" | "smooth" | "grab" | "inflate" | "flatten",
+          radius: brushRadius,
+          strength: brushStrength,
+        });
+        return patchObject(s, objectId, { mesh: shaped.mesh });
+      });
+    },
+    [brush, brushRadius, brushStrength, objectId],
+  );
+
+  /** Number inputs in the properties panel drive the same transforms. */
+  const setObjectTransform = useCallback(
+    (
+      key: "position" | "rotation" | "scale",
+      axis: 0 | 1 | 2,
+      value: number,
+    ) => {
+      if (!objectId) return;
+      setScene((s) => {
+        const obj = findObject(s, objectId);
+        if (!obj) return s;
+        const next = [...obj.transform[key]] as Vec3;
+        next[axis] = value;
+        return patchObject(s, objectId, { transform: { ...obj.transform, [key]: next } });
+      });
+    },
+    [objectId],
+  );
 
   const persist = async (publish: boolean, opts?: { asNew?: boolean; title?: string }) => {
     setNotice(null);
@@ -448,6 +643,8 @@ const Studio = () => {
 
   const isOwner = !record || (!!user && user.id === record.user_id);
   const setDimension = (d: Dimension) => setConfig((c) => ({ ...c, dimension: d }));
+  // Which axis the gizmo drags on, mirroring Blender's G/R/S tools.
+  const transformMode = tool === "Rotate" ? "rotate" : tool === "Scale" ? "scale" : "move";
 
   // Input device detection + navigation intents, ported from blender-web's
   // web-input-detector (GHOST-inspired). Drives zoom / pan / orbit in the 3D
