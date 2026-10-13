@@ -91,15 +91,20 @@ async function open3D() {
 // 3) Add a light + camera via the toolbar flyout and see them listed
 {
   const { page, errors } = await open3D();
-  await page.locator('button[title="Add"]').first().click();
+  const addTool = page.locator('button[title="Add"]').first();
+  await addTool.click();
   await sleep(400);
-  const fly = page.locator("[data-add-flyout]");
-  await fly.locator("button", { hasText: "Spot" }).first().click();
+  await page.locator("[data-add-flyout] button", { hasText: "Spot" }).first().click();
   await sleep(600);
-  await fly.locator("button", { hasText: "Camera" }).first().click();
+  // Each add closes the flyout, so reopen it before adding the camera.
+  await addTool.click();
+  await sleep(400);
+  await page.locator("[data-add-flyout] button", { hasText: "Camera" }).first().click();
   await sleep(600);
-  const outliner = await page.getByText("SCENE COLLECTION").locator("..").innerText().catch(() => "");
-  report.outlinerAfterAdd = outliner.replace(/\n/g, " | ");
+  report.outlinerObjectsDetected = await page.evaluate(() => {
+    const el = [...document.querySelectorAll("div,button")].find((n) => n.textContent?.trim() === "SCENE COLLECTION");
+    return el ? el.parentElement?.innerText.replace(/\n/g, " | ").slice(0, 240) : null;
+  });
   report.spotAdded = await page.getByText("Spot", { exact: true }).count();
   report.cameraAdded = await page.getByText("Camera.001", { exact: true }).count();
   await page.screenshot({ path: "/tmp/opencode/studio-added.png" });
@@ -107,6 +112,6 @@ async function open3D() {
   report.errorsAdd = errors;
 }
 
-report.anyConsoleErrors = Object.entries(report).filter(([k, v]) => Array.isArray(v)).flat().length;
+report.anyConsoleErrors = Object.entries(report).filter(([k, v]) => Array.isArray(v)).flat();
 await browser.close();
 console.log(JSON.stringify(report, null, 2));

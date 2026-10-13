@@ -2654,7 +2654,6 @@ const Studio = () => {
               onCameraMove: moveActiveCamera,
               onCameraOrbit: orbitActiveCamera,
               onCameraZoom: zoomActiveCamera,
-              shading: shading as "solid" | "smooth" | "wire" | "mat" | "rend",
             }}
             outlinerObjects={scene.objects}
             selectedObjectId={objectId}
