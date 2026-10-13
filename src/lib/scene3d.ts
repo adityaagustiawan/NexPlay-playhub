@@ -56,6 +56,8 @@ export interface SceneObject {
   camera?: { fov: number; isActive: boolean };
   /** Optional link back to a gameplay role the object stands for. */
   role?: "player" | "collectible" | "hazard" | "environment" | "shop";
+  /** Blender-style keyframed transform channels (location/rotation/scale). */
+  anim?: SceneAnimation;
 }
 
 export interface Scene {
@@ -308,7 +310,10 @@ export const createPlane = (size = 4, divisions = 2): MeshData => {
       const b = a + 1;
       const c = (z + 1) * row + x + 1;
       const d = (z + 1) * row + x;
-      faces.push([a, b, c, d]);
+      // Wind the quad so its front face points +Y (up). The viewport shades
+      // both sides, but real engines (Godot/Unreal) cull backfaces — a floor
+      // with -Y normals would be invisible from above after export.
+      faces.push([a, d, c, b]);
     }
   }
   return { vertices, faces };
@@ -860,6 +865,32 @@ export function createMeshObject(
   };
 }
 
+/**
+ * Creates a mesh object from arbitrary geometry (e.g. an imported GLB/OBJ
+ * model). Like `spawnTransform`, the object is grounded: position.y is lowered
+ * so the mesh's lowest vertex sits on the studio floor (world y = 0).
+ */
+export function createMeshObjectFromData(
+  name: string,
+  mesh: MeshData,
+  position: Vec3 = v3(0, 0, 0),
+  color?: string,
+): SceneObject {
+  const bounds = boundsOf(mesh.vertices);
+  return {
+    id: nextId("mesh"),
+    name,
+    kind: "mesh",
+    mesh,
+    transform: {
+      ...defaultTransform(),
+      position: v3(position[0], position[1] - bounds.min[1], position[2]),
+    },
+    color: color ?? PALETTE[Math.max(0, name.length) % PALETTE.length],
+    visible: true,
+  };
+}
+
 /** Creates a camera that looks at `target` from `position`, at an optional roll. */
 export function createCamera(position: Vec3 = v3(7, 5, 9), target: Vec3 = v3(0, 1, 0)): SceneObject {
   return {
@@ -900,6 +931,35 @@ export function createDemoScene(): Scene {
   // The starter camera is the one you look through.
   camera.camera!.isActive = true;
   return { objects: [cube, camera, sun], activeCameraId: camera.id };
+}
+
+/**
+ * The "3D Starter" template scene — a small Blender/Unity-style diorama:
+ * a ground plane, a few primitives (how they read as silhouette) and two
+ * lights, so the artist opens into a lit, framed world instead of one cube.
+ */
+export function createStarterScene3D(): Scene {
+  const floor = createMeshObject("plane", "Floor", v3(0, -0.02, 0));
+  floor.color = "#3f3f3f";
+  floor.transform.scale = [9, 1, 9];
+
+  const cube = createMeshObject("cube", "Cube", v3(-2.4, 0, -0.6));
+  const sphere = createMeshObject("uv_sphere", "Sphere", v3(0.6, 0, 1.2));
+  const cylinder = createMeshObject("cylinder", "Cylinder", v3(2.7, 0, -0.4));
+  const torus = createMeshObject("torus", "Torus", v3(-0.4, 0, -2.2));
+  const cone = createMeshObject("cone", "Cone", v3(1.9, 0, -2.4));
+  const suzanne = createMeshObject("suzanne", "Suzanne", v3(0.1, 0, 0.2));
+  suzanne.transform.rotation = [0, 25, 0];
+
+  const camera = createCamera(v3(11, 8, 13), v3(0, 1.2, 0));
+  camera.camera!.isActive = true;
+  const sun = createLight("sun", v3(4, 9, 3));
+  const rim = createLight("point", v3(-6, 3, -7), 420);
+
+  return {
+    objects: [floor, cube, sphere, cylinder, torus, cone, suzanne, camera, sun, rim],
+    activeCameraId: camera.id,
+  };
 }
 
 /**
@@ -997,6 +1057,143 @@ export function setActiveCamera(scene: Scene, id: string): Scene {
         : o,
     ),
   };
+}
+
+// --------------------------------------------------------------- animation
+
+export type Interpolation = "linear" | "smooth";
+
+/** A keyframed channel: sorted unique frame numbers, one value per frame. */
+export interface KeyframeTrack {
+  frames: number[];
+  values: Vec3[];
+  interpolation: Interpolation;
+}
+
+/** Keyframed transform channels on a scene object (Blender-style). */
+export interface SceneAnimation {
+  pos?: KeyframeTrack;
+  rot?: KeyframeTrack;
+  scl?: KeyframeTrack;
+}
+
+export const emptyTrack = (interpolation: Interpolation = "smooth"): KeyframeTrack => ({
+  frames: [],
+  values: [],
+  interpolation,
+});
+
+/** Inserts (or replaces) a key on one channel of an object, keeping frames sorted. */
+export function insertKey(
+  obj: SceneObject,
+  channel: "pos" | "rot" | "scl",
+  frame: number,
+  value: Vec3,
+): SceneObject {
+  const anim: SceneAnimation = obj.anim ?? {
+    pos: channel === "pos" ? emptyTrack() : undefined,
+    rot: channel === "rot" ? emptyTrack() : undefined,
+    scl: channel === "scl" ? emptyTrack() : undefined,
+  };
+  const track: KeyframeTrack = anim[channel] ?? emptyTrack();
+  const frames = [...track.frames];
+  const values = [...track.values];
+  const i = frames.findIndex((f) => f >= frame);
+  if (i >= 0 && frames[i] === frame) {
+    values[i] = value;
+  } else {
+    const at = i === -1 ? frames.length : i;
+    frames.splice(at, 0, frame);
+    values.splice(at, 0, value);
+  }
+  return { ...obj, anim: { ...anim, [channel]: { ...track, frames, values } } };
+}
+
+/** Scene-level helper: insert a keyframe on an object by id. */
+export function insertKeyframe(
+  scene: Scene,
+  id: string,
+  channel: "pos" | "rot" | "scl",
+  frame: number,
+  value: Vec3,
+): Scene {
+  const obj = findObject(scene, id);
+  if (!obj) return scene;
+  return {
+    ...scene,
+    objects: scene.objects.map((o) => (o.id === id ? insertKey(o, channel, frame, value) : o)),
+  };
+}
+
+/** Evaluates a track at `frame` (clamped, linear/smoothstep interpolation). */
+export function evaluateTrack(track: KeyframeTrack | undefined, frame: number): Vec3 | null {
+  if (!track || track.frames.length === 0) return null;
+  const f = track.frames;
+  if (frame <= f[0]) return track.values[0];
+  const last = f.length - 1;
+  if (frame >= f[last]) return track.values[last];
+  let i = 1;
+  while (i < f.length && f[i] < frame) i++;
+  const va = track.values[i - 1];
+  const vb = track.values[i];
+  let t = (frame - f[i - 1]) / (f[i] - f[i - 1]);
+  if (track.interpolation === "smooth") t = t * t * (3 - 2 * t);
+  return [
+    va[0] + (vb[0] - va[0]) * t,
+    va[1] + (vb[1] - va[1]) * t,
+    va[2] + (vb[2] - va[2]) * t,
+  ];
+}
+
+/** Transform of an object at a frame; the rest pose when the channel has no keys. */
+export function evaluateObjectAnim(obj: SceneObject, frame: number): Transform {
+  if (!obj.anim) return obj.transform;
+  const pos = evaluateTrack(obj.anim.pos, frame);
+  const rot = evaluateTrack(obj.anim.rot, frame);
+  const scl = evaluateTrack(obj.anim.scl, frame);
+  if (!pos && !rot && !scl) return obj.transform;
+  const t = obj.transform;
+  return {
+    position: pos ?? t.position,
+    rotation: rot ?? t.rotation,
+    scale: scl ?? t.scale,
+  };
+}
+
+/** Scene copy with every object's transform evaluated at `frame` (same ref when unchanged). */
+export function evaluateScene(scene: Scene, frame: number): Scene {
+  let changed = false;
+  const objects = scene.objects.map((o) => {
+    const t = evaluateObjectAnim(o, frame);
+    const same =
+      t.position[0] === o.transform.position[0] &&
+      t.position[1] === o.transform.position[1] &&
+      t.position[2] === o.transform.position[2] &&
+      t.rotation[0] === o.transform.rotation[0] &&
+      t.rotation[1] === o.transform.rotation[1] &&
+      t.rotation[2] === o.transform.rotation[2] &&
+      t.scale[0] === o.transform.scale[0] &&
+      t.scale[1] === o.transform.scale[1] &&
+      t.scale[2] === o.transform.scale[2];
+    if (same) return o;
+    changed = true;
+    return { ...o, transform: t };
+  });
+  return changed ? { ...scene, objects } : scene;
+}
+
+/** Last keyframe frame across the whole scene (0 when nothing is animated). */
+export function animationEndFrame(scene: Scene): number {
+  let end = 0;
+  for (const o of scene.objects) {
+    const anim = o.anim;
+    if (!anim) continue;
+    for (const ch of ["pos", "rot", "scl"] as const) {
+      const track = anim[ch];
+      if (track && track.frames.length > 0) end = Math.max(end, track.frames[track.frames.length - 1]);
+    }
+  }
+  return end;
 }
 
 // --------------------------------------------------------------- serialization
